@@ -3,24 +3,32 @@
  *  ScriptForge AI — Vercel Serverless Function
  *  File: api/generate.js
  * ----------------------------------------------------------------------------
- *  WHAT THIS FILE DOES
+ *  ROLE
  *    1. Performs the OpenRouter API handshake 100% server-side so the
  *       OPENROUTER_API_KEY never reaches the browser (no key leakage).
- *    2. Forces the model to return a single raw JSON object containing a
+ *    2. Routes requests across an active 2026 free-model grid with automatic
+ *       failover, so a discontinued or rate-limited node never kills a request.
+ *    3. Forces the model to return a single raw JSON object containing a
  *       virality score, 3 hooks, 3 titles, a scene-by-scene script and
  *       high-ranking SEO metadata.
- *    3. Automatically falls back to a secondary free model if the primary
- *       free model fails or is rate-limited.
+ *    4. Doubles as a lightweight status endpoint (GET) so the client can
+ *       render the "API Gateway Profiles" and "System Performance" panels
+ *       without ever exposing the secret.
+ *
+ *  ACTIVE MODEL GRID (2026)
+ *    PRIMARY  : nvidia/llama-3.1-nemotron-70b-instruct:free
+ *    FAILOVER : meta-llama/llama-3.1-8b-instruct:free
+ *    FAILOVER : google/gemma-2-9b-it:free
  *
  *  DEPLOYMENT
- *    This file lives at /api/generate.js and is deployed automatically as a
- *    serverless function by Vercel. The API key is read from the environment
- *    variable OPENROUTER_API_KEY — set it in the Vercel Dashboard under
- *    Settings → Environment Variables, then redeploy.
+ *    Lives at /api/generate.js and deploys automatically as a serverless
+ *    function. The API key is read from process.env.OPENROUTER_API_KEY —
+ *    set it in the Vercel Dashboard under Settings → Environment Variables,
+ *    then redeploy. An optional APP_URL is sent as the OpenRouter HTTP-Referer.
  *
  *  SECURITY MODEL
  *    • No secrets are ever hard-coded in the client bundle.
- *    • The function is the only code path that talks to OpenRouter.
+ *    • This function is the only code path that talks to OpenRouter.
  *    • Inputs are validated and sanitized before they touch the model.
  *    • The model's raw output is parsed and re-shaped defensively so the
  *      frontend only ever receives a known-good structure.
@@ -31,11 +39,20 @@
 // Configuration
 // ----------------------------------------------------------------------------
 
-/** Primary model — high quality free instruct model. */
+/** Primary router target — highest quality free instruct model. */
 const PRIMARY_MODEL = "nvidia/llama-3.1-nemotron-70b-instruct:free";
 
-/** Fallback model — used automatically if the primary model errors out. */
-const FALLBACK_MODEL = "meta-llama/llama-3-8b-instruct:free";
+/**
+ * Automated failover array — tried in order if the primary fails.
+ * Both nodes are active free models as of 2026.
+ */
+const FAILOVER_MODELS = [
+  "meta-llama/llama-3.1-8b-instruct:free",
+  "google/gemma-2-9b-it:free",
+];
+
+/** The complete routing order used by the handler. */
+const ROUTE = [PRIMARY_MODEL, ...FAILOVER_MODELS];
 
 /** OpenRouter chat completions endpoint. */
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -111,7 +128,7 @@ HARD RULES — violations are unacceptable:
 /** Sets permissive CORS headers so the SPA can call the function. */
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
@@ -228,10 +245,35 @@ function sanitizeResult(raw, meta) {
   };
 }
 
+/** Human-readable guidance for common upstream HTTP statuses. */
+function hintForStatus(status) {
+  switch (status) {
+    case 401:
+      return "The OPENROUTER_API_KEY was rejected (401). Regenerate your key at openrouter.ai/keys and update the Vercel environment variable, then redeploy.";
+    case 402:
+      return "The OpenRouter account has no available credits (402). Top up the account or switch to a free-tier plan.";
+    case 403:
+      return "Access denied (403). This key may not be authorized for the requested model.";
+    case 404:
+      return "A model endpoint returned 404 — that node has been discontinued. This app already targets active free models; report this so the grid can be updated.";
+    case 408:
+    case 504:
+      return "The upstream model timed out. Free models can be slow under heavy load — retry in a few seconds.";
+    case 429:
+      return "OpenRouter's free-tier global rate limit was hit (429). Wait ~30 seconds and retry, or add a funded key to remove the cap.";
+    case 500:
+    case 502:
+    case 503:
+      return `OpenRouter is having upstream issues (HTTP ${status}). Retry shortly.`;
+    default:
+      return `Unexpected upstream response (HTTP ${status}). Retry in a moment.`;
+  }
+}
+
 /**
  * Calls a single model on OpenRouter and returns the assistant message
- * content. Throws a descriptive error on any failure so the caller can
- * decide whether to try the fallback model.
+ * content. Throws a descriptive error (with `.status`) on any failure so the
+ * caller can decide whether to continue down the failover array.
  */
 async function callModel(model, messages, apiKey) {
   const controller = new AbortController();
@@ -269,16 +311,28 @@ async function callModel(model, messages, apiKey) {
         (payload && payload.error && payload.error.message) ||
         text.slice(0, 300) ||
         "HTTP " + upstream.status;
-      const error = new Error("OpenRouter " + upstream.status + ": " + message);
+      const error = new Error("HTTP " + upstream.status + ": " + message);
       error.status = upstream.status;
       throw error;
     }
 
-    const content = payload && payload.choices && payload.choices[0] && payload.choices[0].message && payload.choices[0].message.content;
+    const content =
+      payload &&
+      payload.choices &&
+      payload.choices[0] &&
+      payload.choices[0].message &&
+      payload.choices[0].message.content;
     if (!content) {
       throw new Error("OpenRouter returned an empty completion.");
     }
     return content;
+  } catch (err) {
+    if (err && err.name === "AbortError") {
+      const error = new Error("Timed out after " + Math.round(REQUEST_TIMEOUT_MS / 1000) + "s.");
+      error.status = 408;
+      throw error;
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
   }
@@ -299,12 +353,33 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
+  // --------------------------------------------------------------------------
+  // GET — gateway status / routing profile (no secrets exposed).
+  // Used by the client's "API Gateway Profiles" and "System Performance" tabs.
+  // --------------------------------------------------------------------------
+  if (req.method === "GET") {
+    return res.status(200).json({
+      success: true,
+      service: "ScriptForge AI — OpenRouter Gateway",
+      keyConfigured: Boolean(process.env.OPENROUTER_API_KEY),
+      models: ROUTE.map((id) => ({
+        id,
+        role: id === PRIMARY_MODEL ? "primary" : "failover",
+      })),
+      maxDurationSeconds: maxDuration,
+    });
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
-      error: "Method Not Allowed. Send a POST request to /api/generate.",
+      error: "Method Not Allowed. Use POST to generate, or GET for gateway status.",
     });
   }
+
+  // --------------------------------------------------------------------------
+  // POST — generation
+  // --------------------------------------------------------------------------
 
   // Parse the request body (Vercel auto-parses JSON; handle strings too).
   let body;
@@ -320,7 +395,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: "The 'niche' field is required." });
   }
   if (niche.length > 400) {
-    return res.status(400).json({ success: false, error: "The 'niche' field is too long (max 400 characters)." });
+    return res.status(400).json({
+      success: false,
+      error: "The 'niche' field is too long (max 400 characters).",
+    });
   }
 
   // Validate/sanitize the optional fields.
@@ -344,28 +422,34 @@ export default async function handler(req, res) {
     { role: "user", content: buildUserPrompt({ niche, language, tone, platform, duration }) },
   ];
 
-  // Try the primary model, then fall back to the secondary model.
+  // Try the primary model, then cascade down the failover array.
   let rawText = null;
-  let lastError = null;
-  let usedModel = PRIMARY_MODEL;
+  let usedModel = null;
   let usedFallback = false;
+  let lastStatus = 0;
+  const attempts = [];
 
-  for (const model of [PRIMARY_MODEL, FALLBACK_MODEL]) {
+  for (const model of ROUTE) {
     try {
       rawText = await callModel(model, messages, apiKey);
       usedModel = model;
-      usedFallback = model === FALLBACK_MODEL;
+      usedFallback = model !== PRIMARY_MODEL;
+      attempts.push({ model, status: 200 });
       break;
     } catch (err) {
-      lastError = err && err.message ? err.message : String(err);
+      lastStatus = (err && err.status) || 0;
+      const message = (err && err.message) || "Unknown upstream error";
+      attempts.push({ model, status: lastStatus, error: message });
     }
   }
 
   if (!rawText) {
     return res.status(502).json({
       success: false,
-      error: "All configured models failed. Please try again in a moment.",
-      detail: lastError,
+      error: `All ${ROUTE.length} configured models failed to respond.`,
+      detail: attempts.map((a) => `${a.model} → ${a.error || "HTTP " + a.status}`).join(" | "),
+      hint: hintForStatus(lastStatus),
+      attempts,
     });
   }
 
@@ -385,6 +469,7 @@ export default async function handler(req, res) {
     data,
     model: usedModel,
     usedFallback,
+    attempts,
     generatedAt: new Date().toISOString(),
   });
 }
