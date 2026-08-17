@@ -1,16 +1,15 @@
 # ⚡ ScriptForge AI — Viral Content Script Generator
 
 A premium, fully automated **Content Script Generator SaaS** web app. Paste a
-niche, pick a language, and get a complete, ready-to-shoot campaign — 3
+niche, pick a platform, and get a complete, ready-to-shoot campaign — 3
 high-retention hooks, 3 viral titles, a scene-by-scene script with visual/audio
 directions, a virality score, and high-ranking SEO metadata with 10 hashtags.
 
-- **Frontend** — ultra-premium responsive SPA (glassmorphism, dark mode),
-  optimized for Android WebView / APK conversion.
+- **Frontend** — luxury cosmic-midnight SPA (glassmorphism, neon violet brand,
+  sliding dashboard sidebar), optimized for Android WebView / APK conversion.
 - **Backend** — secure Vercel serverless function that proxies OpenRouter so the
   API key never reaches the browser.
-- **Model** — `nvidia/llama-3.1-nemotron-70b-instruct:free` with automatic
-  fallback to `meta-llama/llama-3-8b-instruct:free`.
+- **Model grid** — active 2026 free models with automatic failover.
 
 ---
 
@@ -19,15 +18,11 @@ directions, a virality score, and high-ranking SEO metadata with 10 hashtags.
 ```
 ├── api/
 │   └── generate.js       # Vercel serverless Node.js backend (OpenRouter proxy)
-├── index.html            # Ultra-premium responsive frontend UI
-├── style.css             # Glassmorphism & custom utility styles
-├── app.js                # Frontend state management & secure API fetching
+├── index.html            # Luxury responsive frontend UI
+├── style.css             # Cosmic-midnight design system + sidebar
+├── app.js                # State, theming, sidebar, secure API fetching
 └── README.md             # Setup and deployment documentation
 ```
-
-> Tailwind is loaded via CDN for rapid utility prototyping. The shipped UI is
-> fully self-contained in `style.css`, so it renders **pixel-identically**
-> inside an Android WebView APK even before the CDN/fonts finish loading.
 
 ---
 
@@ -58,7 +53,7 @@ vercel --prod     # deploy to production
 
 After adding a variable, **redeploy** so the function picks it up.
 
-> 🆓 Get a key at [openrouter.ai/keys](https://openrouter.ai/keys). The two
+> 🆓 Get a key at [openrouter.ai/keys](https://openrouter.ai/keys). The three
 > configured models are **free**, so generations cost `$0`.
 
 ---
@@ -77,17 +72,54 @@ Browser (app.js)  ──POST /api/generate──▶  Vercel Function (api/genera
   options to `/api/generate`.
 - The key is read from `process.env.OPENROUTER_API_KEY` at request time, which
   maps 1:1 to the Vercel Dashboard environment variables.
+- A `GET /api/generate` status call returns the routing profile (model grid,
+  key-configured flag, max duration) **without ever exposing the secret** — it
+  powers the in-app "API Gateway Profiles" and "System Performance" panels.
 - All model output is parsed and re-shaped server-side into a known-good JSON
   structure, then HTML-escaped again on the client to prevent XSS.
-- CORS is enabled for browser clients; only `POST` and `OPTIONS` are allowed.
+- CORS is enabled for browser clients; only `POST`, `GET`, and `OPTIONS` are
+  allowed.
+
+---
+
+## 🤖 Active model grid (2026)
+
+Routing lives in `api/generate.js`:
+
+| Role | Model | Plan |
+| --- | --- | --- |
+| Primary | `nvidia/llama-3.1-nemotron-70b-instruct:free` | Free |
+| Failover 1 | `meta-llama/llama-3.1-8b-instruct:free` | Free |
+| Failover 2 | `google/gemma-2-9b-it:free` | Free |
+
+Requests try the primary first, then cascade down the failover array. Every
+attempt is logged; if all nodes fail, the response includes a descriptive
+message and a targeted hint (401 invalid key, 402 no credits, 404 discontinued
+node, 429 free-tier global rate limit, 408/504 timeout, 5xx upstream).
 
 ---
 
 ## 📡 API contract
 
-**`POST /api/generate`**
+**`GET /api/generate`** — gateway status (no secrets):
 
-Request body (JSON):
+```json
+{
+  "success": true,
+  "service": "ScriptForge AI — OpenRouter Gateway",
+  "keyConfigured": true,
+  "models": [
+    { "id": "nvidia/llama-3.1-nemotron-70b-instruct:free", "role": "primary" },
+    { "id": "meta-llama/llama-3.1-8b-instruct:free", "role": "failover" },
+    { "id": "google/gemma-2-9b-it:free", "role": "failover" }
+  ],
+  "maxDurationSeconds": 60
+}
+```
+
+**`POST /api/generate`** — generation.
+
+Request body:
 
 ```json
 {
@@ -99,7 +131,7 @@ Request body (JSON):
 }
 ```
 
-Response (JSON):
+Response:
 
 ```json
 {
@@ -116,6 +148,7 @@ Response (JSON):
   },
   "model": "nvidia/llama-3.1-nemotron-70b-instruct:free",
   "usedFallback": false,
+  "attempts": [{ "model": "…", "status": 200 }],
   "generatedAt": "2026-08-17T00:00:00.000Z"
 }
 ```
@@ -126,44 +159,43 @@ Response (JSON):
 
 | Feature | Where |
 | --- | --- |
-| Virality meter (animated SVG gauge + count-up) | `app.js` → `animateGauge()` |
+| Neon violet gear + bolt inline SVG logo | `index.html` header / sidebar / footer |
+| Platform brand palettes (TikTok, YouTube, Instagram, LinkedIn) | `app.js` → `PLATFORM_BRANDS` + `applyBrand()` |
+| Glowing platform indicator lamp + branded generate button | `#brandLamp`, `--brand-1/--brand-2` CSS vars |
+| Sliding dashboard sidebar (burger → panel) | `#sidebar`, `#burgerBtn` in `app.js` |
+| History tab with live search | `#historySearch` + `renderHistory()` |
+| System Performance tab (live client + server metrics) | `renderPerformance()` |
+| API Gateway Profiles tab (model grid + key status) | `renderProfiles()` via `GET /api/generate` |
+| Virality meter (animated SVG gauge + count-up) | `animateGauge()` |
 | Multi-language (English / Hinglish / Urdu–Hindi) | `#languageToggle` + system prompt |
-| Section copy + "Copy Whole Campaign" + "Copied ✓" | `app.js` → `handleCopy()` |
-| On-device history ledger (view / reload / discard) | `localStorage` key `scriptforge.history.v1` |
-| Skeleton shimmer loading | `app.js` → `renderSkeleton()` |
-| Ad placeholder slots (header bottom + output footer) | `#ad-header`, `#ad-output` |
-
-### Monetization — where to paste your ad code
-
-Two **non-breaking** placeholder containers are hard-coded and clearly marked:
-
-1. **Header bottom banner** — in `index.html`, inside `#ad-header` (the
-   `.ad-placeholder` block directly below the header).
-2. **Output footer banner** — in `index.html`, inside `#ad-output` (shown after
-   the SEO metadata block when a campaign is generated).
-
-Replace the placeholder markup inside those containers with your AdMob / AdSense
-/ Unity banner snippet. The slots are sized for **728×90** (tablet/desktop) and
-**320×50** (mobile).
+| Section copy + "Copy Whole Campaign" + "Copied ✓" | `handleCopy()` |
+| On-device history (view / reload / discard) | `localStorage` key `scriptforge.history.v1` |
+| Local telemetry (generations, success rate, latency) | `localStorage` key `scriptforge.telemetry.v1` |
+| Skeleton shimmer loading | `renderSkeleton()` |
 
 ---
 
-## 🤖 Customizing models & prompt
+## 🎨 Branding system
 
-- **Models** — edit `PRIMARY_MODEL` / `FALLBACK_MODEL` at the top of
-  `api/generate.js`. Any OpenRouter model slug works.
-- **System prompt** — edit the `SYSTEM_PROMPT` template literal in
-  `api/generate.js` to change tone, schema, or rules.
-- **Timeout** — `maxDuration = 60` is exported. On the free Vercel (Hobby) plan
-  the function is capped at ~10s by default; upgrade to Pro or swap in a faster
-  model if you hit timeouts.
+The canvas is **cosmic midnight `#030712`** with a neon violet brand
+(`#7C3AED → #A855F7 → #E879F9`). Selecting a platform live-swaps the accent:
+
+| Platform | Palette |
+| --- | --- |
+| TikTok | Cyan `#00f2fe` → Magenta `#fe0979` |
+| YouTube Shorts | Crimson `#FF0000` |
+| Instagram Reels | Sunset `#f9ce34` → `#ee2a7b` |
+| LinkedIn | Corporate Blue `#0077b5` |
+
+The glowing lamp beside the platform selector, its focus ring, and the generate
+button all adopt the selected platform's colors in real time.
 
 ---
 
 ## 📱 Android APK conversion (WebView)
 
 This SPA is built mobile-first (no horizontal scroll, `viewport-fit=cover`,
-touch-optimized inputs, `localStorage` history, clipboard fallback via
+touch-optimized inputs, `localStorage` history/telemetry, clipboard fallback via
 `document.execCommand`), so it wraps cleanly into a native app.
 
 **Recommended — Capacitor:**
@@ -176,23 +208,21 @@ npx cap sync
 # open ./android with Android Studio → Build → APK
 ```
 
-Set the app to load your deployed Vercel URL (e.g. in `capacitor.config` or a
-`window.location` redirect in `MainActivity`). HTTPS is required for the
+Set the app to load your deployed Vercel URL. HTTPS is required for the
 Clipboard API — your Vercel `*.vercel.app` URL is already HTTPS.
 
 **Notes for WebView:**
 - Keep the page served over HTTPS so `navigator.clipboard` works; the
   `execCommand` fallback covers older WebView builds.
-- The app works offline up to the point of generation (generation needs the
-  backend), and the history ledger works fully offline.
+- The app works offline up to the point of generation, and the history ledger
+  plus telemetry work fully offline.
 
 ---
 
 ## 🛠 Local development
 
 ```bash
-# Serve the static files
-npx serve .
+npx serve .                 # static files
 # or
 python3 -m http.server 8000
 ```
@@ -205,8 +235,8 @@ python3 -m http.server 8000
 vercel dev        # serves both the SPA and the API at http://localhost:3000
 ```
 
-Without a deployed backend, the app offers a **"Preview with sample data"**
-button so you can evaluate the full UI offline.
+Without a deployed backend, the app offers a **"Load demo campaign"** button so
+you can evaluate the full UI offline.
 
 ---
 
@@ -215,8 +245,8 @@ button so you can evaluate the full UI offline.
 | Symptom | Fix |
 | --- | --- |
 | `OPENROUTER_API_KEY is not configured` | Add the env var in Vercel → Settings → Environment Variables → redeploy. |
-| `All configured models failed` | Free models can be rate-limited; wait a moment and retry, or change `PRIMARY_MODEL`/`FALLBACK_MODEL`. |
-| Function times out (504) | Upgrade Vercel plan for >10s function duration, or use a faster model. |
+| `All … models failed to respond` + 429 hint | Free-tier global rate limit — wait ~30s and retry, or add a funded key. |
+| Function times out (504) | Upgrade Vercel plan for >10s function duration, or swap in a faster model. |
 | "Could not reach the server" in browser | You opened `index.html` as a static file — deploy to Vercel or run `vercel dev`. |
 
 ---

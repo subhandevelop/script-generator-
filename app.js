@@ -1,13 +1,14 @@
 /* ============================================================================
    ScriptForge AI — app.js
-   Frontend state management, secure API fetching, and all interactive output
-   (virality meter, copy utilities, on-device history ledger).
+   Frontend state management, secure API fetching, platform brand theming,
+   sliding dashboard sidebar (history / performance / gateway profiles), and
+   all interactive outputs (virality meter, copy utilities, history ledger).
    ----------------------------------------------------------------------------
    SECURITY NOTES
    • The OpenRouter API key is NEVER present in this file. All model traffic
      goes through the Vercel serverless function at /api/generate.
    • All model/user text is HTML-escaped before injection to prevent XSS.
-   • No third-party trackers. History is stored only in browser localStorage.
+   • No third-party trackers. History & telemetry live only in localStorage.
    ========================================================================== */
 
 (function () {
@@ -17,7 +18,8 @@
   // Constants
   // ---------------------------------------------------------------------------
   var HISTORY_KEY = "scriptforge.history.v1";
-  var HISTORY_LIMIT = 30;
+  var TELEMETRY_KEY = "scriptforge.telemetry.v1";
+  var HISTORY_LIMIT = 40;
   var GAUGE_RADIUS = 84;
   var GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS; // ≈ 527.79
 
@@ -33,13 +35,30 @@
     urdu: "Output in the native script — اردو for Urdu audiences, हिन्दी for Hindi.",
   };
 
+  // Authentic platform brand palettes (drives lamp, focus ring & button).
+  var PLATFORM_BRANDS = {
+    "YouTube Shorts": { a: "#FF0000", b: "#FF5A5A" },
+    "TikTok": { a: "#00f2fe", b: "#fe0979" },
+    "Instagram Reels": { a: "#f9ce34", b: "#ee2a7b" },
+    "LinkedIn": { a: "#0077b5", b: "#00A0DC" },
+  };
+
+  // Client-side mirror of the server's model grid. Used only for display when
+  // the gateway is unreachable (static preview); live server data takes
+  // precedence whenever the GET status call succeeds.
+  var MODEL_MIRROR = [
+    { id: "nvidia/llama-3.1-nemotron-70b-instruct:free", role: "primary" },
+    { id: "meta-llama/llama-3.1-8b-instruct:free", role: "failover" },
+    { id: "google/gemma-2-9b-it:free", role: "failover" },
+  ];
+
   // ---------------------------------------------------------------------------
-  // SAMPLE DATA — used ONLY when the user explicitly clicks "Preview with sample
-  // data" after the server is unreachable. It never participates in the live
-  // API flow and is provided purely to preview the UI offline / inside a
-  // WebView APK before the backend is wired up.
+  // DEMO CAMPAIGN — used ONLY when the user explicitly clicks "Load demo
+  // campaign" after the server is unreachable. It never participates in the
+  // live API flow; it exists so the full UI can be previewed offline / inside
+  // a WebView APK before the backend is wired up.
   // ---------------------------------------------------------------------------
-  var SAMPLE_DATA = {
+  var DEMO_DATA = {
     viralityScore: 93,
     hooks: [
       "Your belly fat isn't lazy — it's stuck in a cycle most trainers never tell you about.",
@@ -71,30 +90,30 @@
       {
         scene: 3,
         duration: "0:12 - 0:22",
-        visual: "Side angle, slow-motion of the second exercise: plank shoulder taps. Show the hips staying level.",
+        visual: "Side angle, slow-motion of the second exercise: plank shoulder taps. Hips stay level.",
         audio: "Same percussion, snare accents on each tap.",
         text_overlay: "Move 2: Plank Taps",
         dialogue: "Move two: plank shoulder taps. Twelve reps. The shake you feel? That's your core waking up.",
       },
       {
         scene: 4,
-        duration: "0:22 - 0:32",
-        visual: "Front angle of the third exercise: wall sit with a twist. Overlay a 30-second timer.",
-        audio: "Music swells slightly. Add a soft ticking SFX.",
+        duration: "0:22 - 0:34",
+        visual: "Front angle of the third exercise: wall sit with a torso twist. Overlay a 30-second timer.",
+        audio: "Music swells slightly. Soft ticking SFX.",
         text_overlay: "Move 3: Wall Twist",
         dialogue: "Move three: wall sit with a torso twist. Thirty seconds. Squeeze through the obliques.",
       },
       {
         scene: 5,
-        duration: "0:32 - 0:44",
-        visual: "Fast jump-cuts of all three moves with on-screen checkmarks. Flash the full circuit on screen.",
+        duration: "0:34 - 0:46",
+        visual: "Fast jump-cuts of all three moves with on-screen checkmarks. Flash the full circuit.",
         audio: "Music peaks. Energetic, faster delivery.",
         text_overlay: "3 moves · 5 min · daily",
         dialogue: "Do these three moves for five minutes a day. That's it. No gym, no equipment, no excuses.",
       },
       {
         scene: 6,
-        duration: "0:44 - 0:54",
+        duration: "0:46 - 0:56",
         visual: "Back to close-up. Point at the follow button on screen. Nod once.",
         audio: "Music ducks under the voice. Warm, direct tone.",
         text_overlay: "Follow for part 2",
@@ -123,6 +142,7 @@
     language: "english",
     current: null,
     loading: false,
+    gateway: null, // GET /api/generate response (routing profile)
   };
 
   // ---------------------------------------------------------------------------
@@ -138,6 +158,7 @@
   var durationSelect = $("durationSelect");
   var generateBtn = $("generateBtn");
   var generateBtnLabel = $("generateBtnLabel");
+  var brandLamp = $("brandLamp");
   var statusArea = $("statusArea");
   var outputSection = $("outputSection");
   var gaugeFill = $("gaugeFill");
@@ -150,9 +171,25 @@
   var metadataDesc = $("metadataDesc");
   var hashtagsList = $("hashtagsList");
   var copyAllBtn = $("copyAllBtn");
+  var toastEl = $("toast");
+
+  // Sidebar
+  var sidebar = $("sidebar");
+  var sidebarBackdrop = $("sidebarBackdrop");
+  var burgerBtn = $("burgerBtn");
+  var sidebarClose = $("sidebarClose");
+  var historySearch = $("historySearch");
   var historyList = $("historyList");
   var clearHistoryBtn = $("clearHistoryBtn");
-  var toastEl = $("toast");
+  var metricsGrid = $("metricsGrid");
+  var gatewayStatus = $("gatewayStatus");
+  var refreshGatewayBtn = $("refreshGatewayBtn");
+  var profilesList = $("profilesList");
+  var keyStatus = $("keyStatus");
+
+  // Header status pill
+  var headerStatus = $("headerStatus");
+  var headerStatusText = $("headerStatusText");
 
   // ---------------------------------------------------------------------------
   // Utilities
@@ -166,6 +203,15 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  /** Convert a #RRGGBB hex to an rgba() string. */
+  function hexToRgba(hex, alpha) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+    if (!m) return "rgba(168,85,247," + alpha + ")";
+    var n = parseInt(m[1], 16);
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
   }
 
   /** Copy text to the clipboard with a legacy WebView fallback. */
@@ -247,6 +293,26 @@
     return "Solid foundation — tighten the first 3 seconds to unlock more reach. 📈";
   }
 
+  /** Short display name for a model id. */
+  function shortModel(id) {
+    var s = String(id || "").replace(":free", "");
+    var parts = s.split("/");
+    return parts.length > 1 ? parts[1] : s;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Platform brand theming
+  // ---------------------------------------------------------------------------
+  function applyBrand(platformKey) {
+    var brand = PLATFORM_BRANDS[platformKey] || { a: "#A855F7", b: "#E879F9" };
+    var root = document.documentElement;
+    root.style.setProperty("--brand-1", brand.a);
+    root.style.setProperty("--brand-2", brand.b);
+    root.style.setProperty("--brand-1-soft", hexToRgba(brand.a, 0.16));
+    brandLamp.style.background = "linear-gradient(135deg, " + brand.a + ", " + brand.b + ")";
+    brandLamp.style.boxShadow = "0 0 0 3px " + hexToRgba(brand.a, 0.16) + ", 0 0 14px " + brand.a;
+  }
+
   // ---------------------------------------------------------------------------
   // Character count
   // ---------------------------------------------------------------------------
@@ -270,6 +336,234 @@
       btn.setAttribute("aria-selected", active ? "true" : "false");
     });
     langHint.textContent = LANG_HINTS[lang] || "";
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sliding sidebar
+  // ---------------------------------------------------------------------------
+  function openSidebar() {
+    sidebar.classList.add("open");
+    sidebarBackdrop.classList.add("show");
+    burgerBtn.classList.add("open");
+    burgerBtn.setAttribute("aria-expanded", "true");
+    sidebar.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+    sidebarClose.focus();
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove("open");
+    sidebarBackdrop.classList.remove("show");
+    burgerBtn.classList.remove("open");
+    burgerBtn.setAttribute("aria-expanded", "false");
+    sidebar.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  }
+
+  function switchTab(tabName) {
+    var tabs = document.querySelectorAll(".sidebar-tabs .stab");
+    Array.prototype.forEach.call(tabs, function (t) {
+      var active = t.getAttribute("data-tab") === tabName;
+      t.classList.toggle("active", active);
+      t.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    var panels = document.querySelectorAll(".tab-panel");
+    Array.prototype.forEach.call(panels, function (p) {
+      p.hidden = p.getAttribute("data-panel") !== tabName;
+    });
+    if (tabName === "performance") renderPerformance();
+    if (tabName === "profiles") renderProfiles();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Telemetry (localStorage)
+  // ---------------------------------------------------------------------------
+  function defaultTelemetry() {
+    return {
+      generations: 0,
+      successes: 0,
+      failures: 0,
+      totalMs: 0,
+      lastModel: null,
+      lastFallback: false,
+      lastError: null,
+      lastAt: null,
+    };
+  }
+
+  function loadTelemetry() {
+    try {
+      var raw = localStorage.getItem(TELEMETRY_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed : defaultTelemetry();
+    } catch (err) {
+      return defaultTelemetry();
+    }
+  }
+
+  function saveTelemetry(t) {
+    try {
+      localStorage.setItem(TELEMETRY_KEY, JSON.stringify(t));
+    } catch (err) {
+      /* storage unavailable — degrade gracefully */
+    }
+  }
+
+  function recordSuccess(model, usedFallback, ms) {
+    var t = loadTelemetry();
+    t.generations += 1;
+    t.successes += 1;
+    t.totalMs += Math.max(0, ms || 0);
+    t.lastModel = model || null;
+    t.lastFallback = !!usedFallback;
+    t.lastError = null;
+    t.lastAt = new Date().toISOString();
+    saveTelemetry(t);
+  }
+
+  function recordFailure(errMsg) {
+    var t = loadTelemetry();
+    t.generations += 1;
+    t.failures += 1;
+    t.lastError = errMsg || "Unknown error";
+    t.lastAt = new Date().toISOString();
+    saveTelemetry(t);
+  }
+
+  function storageUsageKB() {
+    try {
+      var total = 0;
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        total += (k.length + (localStorage.getItem(k) || "").length) * 2;
+      }
+      return (total / 1024).toFixed(1);
+    } catch (err) {
+      return "0.0";
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Gateway profile (GET /api/generate)
+  // ---------------------------------------------------------------------------
+  function fetchGatewayProfile() {
+    return fetch("/api/generate", { method: "GET", cache: "no-store" })
+      .then(function (res) {
+        return res.text().then(function (text) {
+          var json = null;
+          try { json = text ? JSON.parse(text) : null; } catch (err) { json = null; }
+          if (!res.ok || !json || !json.success) throw new Error("gateway unreachable");
+          return json;
+        });
+      })
+      .then(function (json) {
+        state.gateway = json;
+        renderHeaderStatus();
+        renderPerformance();
+        renderProfiles();
+        return json;
+      })
+      .catch(function () {
+        state.gateway = null;
+        renderHeaderStatus();
+        renderPerformance();
+        renderProfiles();
+        return null;
+      });
+  }
+
+  function renderHeaderStatus() {
+    headerStatus.classList.remove("ok", "warn");
+    if (state.gateway) {
+      if (state.gateway.keyConfigured) {
+        headerStatus.classList.add("ok");
+        headerStatusText.textContent = "API Online · Key ✓";
+      } else {
+        headerStatus.classList.add("warn");
+        headerStatusText.textContent = "API Online · Key missing";
+      }
+    } else {
+      headerStatusText.textContent = "Static preview";
+    }
+  }
+
+  function renderPerformance() {
+    var t = loadTelemetry();
+    var total = t.generations || 0;
+    var successRate = total ? Math.round((t.successes / total) * 100) : 0;
+    var avgMs = t.successes ? Math.round(t.totalMs / t.successes) : null;
+    var avgSec = avgMs == null ? "—" : (avgMs / 1000).toFixed(1) + "s";
+
+    var tiles = [
+      { label: "Generations", value: String(total) },
+      { label: "Success rate", value: successRate + "%" },
+      { label: "Avg response", value: avgSec },
+      { label: "Storage used", value: storageUsageKB() + " KB" },
+      { label: "Last model", value: t.lastModel ? shortModel(t.lastModel) : "—", small: true },
+      { label: "Last failover", value: t.lastFallback ? "Yes" : "No" },
+    ];
+
+    metricsGrid.innerHTML = tiles.map(function (m) {
+      return (
+        '<div class="metric-tile">' +
+          '<span class="metric-label">' + esc(m.label) + "</span>" +
+          '<span class="metric-value' + (m.small ? " small" : "") + '">' + esc(m.value) + "</span>" +
+        "</div>"
+      );
+    }).join("");
+
+    // Server status card
+    if (state.gateway) {
+      var lastErr = t.lastError ? '<div class="row"><span class="k">Last error</span><span class="v">' + esc(String(t.lastError).slice(0, 90)) + "</span></div>" : "";
+      gatewayStatus.innerHTML =
+        '<div class="row"><span class="k">Service</span><span class="v">' + esc(state.gateway.service || "OpenRouter Gateway") + "</span></div>" +
+        '<div class="row"><span class="k">API key</span><span class="v">' + (state.gateway.keyConfigured ? '<span class="badge-ok">Configured</span>' : '<span class="badge-no">Missing</span>') + "</span></div>" +
+        '<div class="row"><span class="k">Active models</span><span class="v">' + esc(String((state.gateway.models || []).length)) + "</span></div>" +
+        '<div class="row"><span class="k">Max duration</span><span class="v">' + esc(String(state.gateway.maxDurationSeconds)) + "s</span></div>" +
+        lastErr;
+    } else {
+      gatewayStatus.innerHTML =
+        '<div class="row"><span class="k">Gateway</span><span class="v"><span class="badge-no">Unreachable</span></span></div>' +
+        '<div class="row"><span class="k">Hint</span><span class="v">Deploy to Vercel and set OPENROUTER_API_KEY to go live.</span></div>';
+    }
+  }
+
+  function renderProfiles() {
+    var models = state.gateway && state.gateway.models && state.gateway.models.length
+      ? state.gateway.models
+      : MODEL_MIRROR;
+    var t = loadTelemetry();
+
+    profilesList.innerHTML = models.map(function (m) {
+      var isPrimary = m.role === "primary";
+      var live = t.lastModel === m.id;
+      return (
+        '<div class="profile-card' + (live ? " current" : "") + '">' +
+          '<div class="profile-top">' +
+            '<span class="profile-model">' + esc(m.id) + "</span>" +
+            '<span class="role-badge ' + (isPrimary ? "role-primary" : "role-failover") + '">' + (isPrimary ? "Primary" : "Failover") + "</span>" +
+          "</div>" +
+          '<div class="profile-status' + (live ? " live" : "") + '">' +
+            '<span class="dot"></span>' +
+            (live ? "Last used for a live generation" : (isPrimary ? "Primary router target" : "Automated failover standby")) +
+            '<span class="free">FREE</span>' +
+          "</div>" +
+        "</div>"
+      );
+    }).join("");
+
+    if (state.gateway) {
+      keyStatus.innerHTML =
+        '<div class="row"><span class="k">OPENROUTER_API_KEY</span><span class="v">' +
+        (state.gateway.keyConfigured ? '<span class="badge-ok">Configured</span>' : '<span class="badge-no">Not set</span>') +
+        "</span></div>" +
+        '<div class="row"><span class="k">Routing</span><span class="v">Server-side, in api/generate.js</span></div>' +
+        '<div class="row"><span class="k">Secret exposure</span><span class="v">Never sent to the browser</span></div>';
+    } else {
+      keyStatus.innerHTML =
+        '<div class="row"><span class="k">Gateway</span><span class="v"><span class="badge-no">Unreachable</span></span></div>' +
+        '<div class="row"><span class="k">Profile source</span><span class="v">Offline mirror</span></div>';
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -318,16 +612,16 @@
         (detail ? '<p class="status-detail">' + esc(detail) + '</p>' : "") +
         '<div class="status-actions">' +
           '<button type="button" class="btn-copy" id="retryBtn">↻ Try again</button>' +
-          '<button type="button" class="btn-copy" id="sampleBtn">Preview with sample data</button>' +
+          '<button type="button" class="btn-copy" id="demoBtn">Load demo campaign</button>' +
         '</div>' +
       '</div>';
 
     $("retryBtn").addEventListener("click", generate);
-    $("sampleBtn").addEventListener("click", function () {
-      state.current = JSON.parse(JSON.stringify(SAMPLE_DATA));
+    $("demoBtn").addEventListener("click", function () {
+      state.current = JSON.parse(JSON.stringify(DEMO_DATA));
       renderOutput(state.current);
       statusArea.hidden = true;
-      toast("Showing sample output (demo data only)");
+      toast("Showing demo campaign (offline preview)");
     });
   }
 
@@ -356,6 +650,7 @@
       duration: durationSelect.value,
     };
 
+    var startedAt = Date.now();
     setLoading(true);
     renderSkeleton();
 
@@ -371,7 +666,6 @@
           if (!res.ok || !json || !json.success) {
             var err = new Error((json && json.error) || "Request failed (HTTP " + res.status + ").");
             err.detail = (json && (json.detail || json.hint)) || null;
-            // A 404/405 means the serverless endpoint is not deployed/routed.
             err.notDeployed = (res.status === 404 || res.status === 405);
             throw err;
           }
@@ -382,23 +676,27 @@
         state.current = json.data;
         renderOutput(state.current);
         pushHistory(state.current);
+        recordSuccess(json.model, json.usedFallback, Date.now() - startedAt);
         clearStatus();
+        renderPerformance();
+        renderProfiles();
         window.scrollTo({ top: 0, behavior: "smooth" });
-        toast("Campaign generated 🎉");
+        toast("Campaign generated 🎉" + (json.usedFallback ? " (failover model)" : ""));
       })
       .catch(function (err) {
-        // TypeError → network failure (static preview / function not deployed).
+        recordFailure(err.message || "Request failed");
+        renderPerformance();
         if (err instanceof TypeError) {
           renderError(
             "Could not reach the server",
             "This happens when the app is opened as a static file or the Vercel function is not deployed yet. Deploy the project and set OPENROUTER_API_KEY, then try again.",
-            "You can still preview the full UI with sample data below."
+            "You can still explore the full UI with the demo campaign below."
           );
         } else if (err.notDeployed) {
           renderError(
             "Backend not found",
             "The /api/generate endpoint is not reachable — the project isn't deployed to Vercel yet (or you are previewing the static files only).",
-            "Deploy the repo to Vercel and set OPENROUTER_API_KEY. You can preview the full UI with sample data below."
+            "Deploy the repo to Vercel and set OPENROUTER_API_KEY. You can explore the full UI with the demo campaign below."
           );
         } else {
           renderError(
@@ -647,29 +945,42 @@
     var list = loadHistory();
     list.unshift(entry);
     saveHistory(list);
-    renderHistory();
+    renderHistory(historySearch.value);
   }
 
-  function renderHistory() {
+  function renderHistory(filterText) {
     var list = loadHistory();
+    var q = String(filterText || "").trim().toLowerCase();
+
     if (!list.length) {
       historyList.innerHTML =
         '<div class="history-empty">No generations yet — your saved campaigns will appear here, stored privately on this device.</div>';
       return;
     }
-    historyList.innerHTML = list.map(function (item) {
+
+    var filtered = q
+      ? list.filter(function (item) {
+          return String(item.niche || "").toLowerCase().indexOf(q) > -1;
+        })
+      : list;
+
+    if (!filtered.length) {
+      historyList.innerHTML =
+        '<div class="history-empty">No results for “' + esc(q) + '”.</div>';
+      return;
+    }
+
+    historyList.innerHTML = filtered.map(function (item) {
       return (
         '<div class="history-item" data-id="' + esc(item.id) + '">' +
-          '<div class="history-main">' +
-            '<div class="history-niche">' + esc(item.niche) + "</div>" +
-            '<div class="history-meta">' +
-              '<span class="chip">' + esc(LANG_LABELS[item.language] || item.language) + "</span>" +
-              '<span class="chip">' + esc(item.platform || "") + "</span>" +
-              '<span class="chip">' + esc(item.duration || "") + "</span>" +
-              '<span class="history-time">' + esc(timeAgo(item.createdAt)) + "</span>" +
-            "</div>" +
+          '<div class="history-niche">' + esc(item.niche) + "</div>" +
+          '<div class="history-meta">' +
+            '<span class="chip">' + esc(LANG_LABELS[item.language] || item.language) + "</span>" +
+            '<span class="chip">' + esc(item.platform || "") + "</span>" +
+            '<span class="chip">' + esc(item.duration || "") + "</span>" +
+            '<span class="history-score">' + esc(item.data && item.data.viralityScore) + "/99</span>" +
+            '<span class="history-time">' + esc(timeAgo(item.createdAt)) + "</span>" +
           "</div>" +
-          '<span class="history-score">' + esc(item.data && item.data.viralityScore) + "/99</span>" +
           '<div class="history-actions">' +
             '<button type="button" class="btn-copy icon" data-action="view" data-id="' + esc(item.id) + '">👁 View</button>' +
             '<button type="button" class="btn-copy icon" data-action="reload" data-id="' + esc(item.id) + '">↻ Reload</button>' +
@@ -694,6 +1005,7 @@
     state.current = item.data;
     renderOutput(item.data);
     clearStatus();
+    closeSidebar();
     window.scrollTo({ top: 0, behavior: "smooth" });
     toast("Loaded from history");
   }
@@ -703,31 +1015,35 @@
     if (!item) return;
     nicheInput.value = item.niche || "";
     if (item.language) setLanguage(item.language);
-    if (item.platform && platformSelect.querySelector('option[value="' + item.platform + '"]')) {
+    if (item.platform && PLATFORM_BRANDS[item.platform]) {
       platformSelect.value = item.platform;
+      applyBrand(item.platform);
     }
-    if (item.duration && durationSelect.querySelector('option[value="' + item.duration + '"]')) {
-      durationSelect.value = item.duration;
-    }
-    if (item.tone && toneSelect.querySelector('option[value="' + item.tone + '"]')) {
-      toneSelect.value = item.tone;
-    }
+    setSelectIfExists(durationSelect, item.duration);
+    setSelectIfExists(toneSelect, item.tone);
     updateCharCount();
+    closeSidebar();
     window.scrollTo({ top: 0, behavior: "smooth" });
     toast("Regenerating with saved inputs…");
     generate();
   }
 
+  function setSelectIfExists(selectEl, value) {
+    if (!value) return;
+    var option = selectEl.querySelector('option[value="' + value + '"]');
+    if (option) selectEl.value = value;
+  }
+
   function discardHistoryItem(id) {
     var list = loadHistory().filter(function (item) { return item.id !== id; });
     saveHistory(list);
-    renderHistory();
+    renderHistory(historySearch.value);
     toast("Removed from history");
   }
 
   function clearHistory() {
     saveHistory([]);
-    renderHistory();
+    renderHistory(historySearch.value);
     toast("History cleared");
   }
 
@@ -743,11 +1059,36 @@
       });
     });
 
+    platformSelect.addEventListener("change", function () {
+      applyBrand(platformSelect.value);
+    });
+
     generateBtn.addEventListener("click", generate);
     copyAllBtn.addEventListener("click", function () {
       handleCopy(copyAllBtn, "all");
     });
+
+    // Sidebar controls
+    burgerBtn.addEventListener("click", function () {
+      sidebar.classList.contains("open") ? closeSidebar() : openSidebar();
+    });
+    sidebarClose.addEventListener("click", closeSidebar);
+    sidebarBackdrop.addEventListener("click", closeSidebar);
+
+    document.querySelectorAll(".sidebar-tabs .stab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        switchTab(tab.getAttribute("data-tab"));
+      });
+    });
+
+    historySearch.addEventListener("input", function () {
+      renderHistory(historySearch.value);
+    });
     clearHistoryBtn.addEventListener("click", clearHistory);
+    refreshGatewayBtn.addEventListener("click", function () {
+      toast("Refreshing server status…");
+      fetchGatewayProfile();
+    });
 
     // Delegated clicks for copy buttons and history actions.
     document.addEventListener("click", function (e) {
@@ -766,16 +1107,22 @@
       }
     });
 
-    // Keyboard shortcut: Ctrl/Cmd + Enter triggers generation.
+    // Keyboard: Ctrl/Cmd + Enter generates; Esc closes the sidebar.
     nicheInput.addEventListener("keydown", function (e) {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
         generate();
       }
     });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && sidebar.classList.contains("open")) closeSidebar();
+    });
 
+    // Initial brand + UI state
+    applyBrand(platformSelect.value);
     updateCharCount();
-    renderHistory();
+    renderHistory("");
+    fetchGatewayProfile();
   }
 
   // Boot when the DOM is ready (script is loaded at end of body anyway).
