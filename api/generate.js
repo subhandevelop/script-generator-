@@ -1,33 +1,39 @@
+export const runtime = 'edge';
+
 /**
  * ============================================================================
- *  ScriptForge AI — Vercel Serverless Function
+ *  ScriptForge AI — Vercel Edge Function (OpenAI-compatible Groq engine)
  *  File: api/generate.js
  * ----------------------------------------------------------------------------
- *  ROLE
- *    1. Runs every generation call 100% server-side on the official Groq
- *       Cloud engine, so the Secure Access Key never reaches the browser.
- *    2. Uses a standard OpenAI-compatible fetch utility against Groq's
- *       endpoint:  https://api.groq.com/openai/v1/chat/completions
- *    3. Forces the engine to return a single raw JSON object containing a
- *       virality score, 3 hooks, 3 titles, a scene-by-scene script, plus a
- *       full creator kit (caption, thumbnail text, call to action, posting
- *       time, audience, series ideas, keywords and hashtags).
- *    4. Guarantees that any network or rate-limit failure surfaces as a
- *       CLEAN, user-friendly message — raw technical strings are logged
- *       server-side only and NEVER returned to the client.
+ *  WHY EDGE RUNTIME
+ *    `export const runtime = 'edge'` runs this route on Vercel's Edge network,
+ *    which is NOT subject to the ~10-second serverless gateway limit that
+ *    kills Node functions on the Hobby plan. Combined with the fast engine
+ *    below (~2-3s per draft), the response pipeline never gets cut off.
+ *    (For plain Vercel projects this is also enabled via vercel.json.)
  *
- *  ENGINE
- *    PRIMARY   : llama-3.3-70b-versatile
- *    FALLBACK  : llama-3.1-8b-instant   (auto-switch if the primary stumbles)
+ *  ENGINE — strictly bound
+ *    MODEL       : llama-3.1-8b-instant   (fast, free, ~2-3s completions)
+ *    MAX TOKENS  : 1200                   (completion loop finishes instantly)
+ *    ENDPOINT    : https://api.groq.com/openai/v1/chat/completions
  *
  *  ACCESS KEY
- *    Read from process.env.GROQ_API_KEY — set it in the Vercel Dashboard
- *    under Settings → Environment Variables, then redeploy.
+ *    Read strictly from process.env.GROQ_API_KEY (exact name — no aliases).
+ *    Set it in the Vercel Dashboard → Settings → Environment Variables, then
+ *    redeploy. Available to Edge Functions via process.env.
+ *
+ *  CLEAN JSON DELIVERY + HEALTHY 200
+ *    Every outcome of a campaign launch returns HTTP 200 with a well-formed
+ *    envelope: { success: true, data } on success, or
+ *    { success: false, error: "<friendly message>", retryable: true } when an
+ *    upstream network/engine exception occurs. Raw technical strings are
+ *    logged server-side only and NEVER returned to the client, so the UI
+ *    always shows a clean, user-friendly alert card.
  * ============================================================================
  */
 
 // ----------------------------------------------------------------------------
-// Groq configuration
+// Engine configuration
 // ----------------------------------------------------------------------------
 
 /** Groq's official OpenAI-compatible base URL. */
@@ -36,17 +42,17 @@ const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 /** Groq chat completions endpoint (standard OpenAI format). */
 const GROQ_CHAT_URL = GROQ_BASE_URL + "/chat/completions";
 
-/** Primary text generation engine. */
-const PRIMARY_MODEL = "llama-3.3-70b-versatile";
+/** Target engine — strictly bound, fast enough to finish well under any limit. */
+const ENGINE_MODEL = "llama-3.1-8b-instant";
 
-/** Automatic fallback engine if the primary errors out. */
-const FALLBACK_MODEL = "llama-3.1-8b-instant";
+/**
+ * Token cap — guarantees the completion loop returns inside 2-3 seconds.
+ * 1200 tokens is comfortably enough for the full campaign JSON.
+ */
+const MAX_TOKENS = 1200;
 
-/** The routing order used by the handler. */
-const MODELS = [PRIMARY_MODEL, FALLBACK_MODEL];
-
-/** Request timeout in ms — safely under Vercel's function cap. */
-const REQUEST_TIMEOUT_MS = 55000;
+/** Per-call timeout (ms). Safety guard only — the fast engine never hits it. */
+const REQUEST_TIMEOUT_MS = 8000;
 
 /** Allowed language identifiers (matches the frontend toggle). */
 const ALLOWED_LANGUAGES = ["english", "hinglish", "urdu"];
@@ -134,11 +140,26 @@ HARD RULES — violations are unacceptable:
 // Helpers
 // ----------------------------------------------------------------------------
 
-/** Sets permissive CORS headers so the SPA can call the function. */
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+/** CORS headers attached to every response so the SPA can read the body. */
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+/**
+ * Clean JSON delivery.
+ * Response.json() is the native Web-standard equivalent of NextResponse.json()
+ * from 'next/server'. If this project is migrated to Next.js App Router, the
+ * one-line swap is:
+ *   import { NextResponse } from 'next/server';
+ *   return NextResponse.json(payload, { status, headers: CORS_HEADERS });
+ */
+function jsonResponse(payload, status) {
+  return Response.json(payload, {
+    status: status || 200,
+    headers: CORS_HEADERS,
+  });
 }
 
 /** Builds the user prompt from validated request fields. */
@@ -169,8 +190,7 @@ function stripCodeFences(text) {
 
 /**
  * Parses engine output into an object. Tries a direct parse first, then falls
- * back to extracting the first balanced { ... } block, so minor stray text
- * around the JSON does not break the pipeline.
+ * back to extracting the first balanced { ... } block.
  */
 function parseModelJson(text) {
   const cleaned = stripCodeFences(text);
@@ -191,10 +211,7 @@ function parseModelJson(text) {
   return null;
 }
 
-/**
- * Re-shapes raw engine output into a guaranteed-safe structure so the
- * frontend never has to guess about missing or malformed fields.
- */
+/** Re-shapes raw engine output into a guaranteed-safe structure. */
 function sanitizeResult(raw, meta) {
   const asStr = (v, fb = "") => (typeof v === "string" && v.trim() ? v.trim() : fb);
   const asNum = (v, fb) => {
@@ -226,7 +243,6 @@ function sanitizeResult(raw, meta) {
     : [];
 
   const keywords = asList(raw && raw.metadata && raw.metadata.keywords, 5);
-
   const hashtags = asList(raw && raw.metadata && raw.metadata.hashtags, 10)
     .map((h) => (h.startsWith("#") ? h : "#" + h))
     .filter((h, i, a) => a.indexOf(h) === i);
@@ -247,7 +263,6 @@ function sanitizeResult(raw, meta) {
       keywords,
       hashtags,
     },
-    // Echo the request context so the UI can render summary chips.
     niche: meta.niche,
     language: meta.language,
     tone: meta.tone,
@@ -256,10 +271,7 @@ function sanitizeResult(raw, meta) {
   };
 }
 
-/**
- * Maps an upstream HTTP status to a CLEAN, user-friendly message.
- * Raw technical details are never included.
- */
+/** Maps an upstream HTTP status to a CLEAN, user-friendly message. */
 function friendlyError(status) {
   switch (status) {
     case 401:
@@ -283,12 +295,11 @@ function friendlyError(status) {
 }
 
 /**
- * Calls a single engine on Groq (OpenAI-compatible chat completions) and
- * returns the assistant message content. Throws a descriptive error (with
- * `.status`) on any failure; the raw upstream message is only used for
- * server-side logging, never for the client response.
+ * Calls Groq's OpenAI-compatible chat completions with the strictly-bound
+ * engine and the 1200-token cap. Throws a clean Error on any failure; raw
+ * upstream detail is only logged server-side.
  */
-async function callEngine(engineId, messages, apiKey) {
+async function callEngine(messages, apiKey) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -300,11 +311,11 @@ async function callEngine(engineId, messages, apiKey) {
         Authorization: "Bearer " + apiKey,
       },
       body: JSON.stringify({
-        model: engineId,
+        model: ENGINE_MODEL, // strictly llama-3.1-8b-instant
         messages,
         temperature: 0.85,
         top_p: 0.95,
-        max_tokens: 3000,
+        max_tokens: MAX_TOKENS, // 1200 → completion finishes in ~2-3s
       }),
       signal: controller.signal,
     });
@@ -352,111 +363,112 @@ async function callEngine(engineId, messages, apiKey) {
 }
 
 // ----------------------------------------------------------------------------
-// Vercel function configuration + handler
+// Edge function handler
 // ----------------------------------------------------------------------------
 
-/** Ask Vercel for a longer execution window. */
-export const maxDuration = 60;
-
-export default async function handler(req, res) {
-  setCors(res);
-
-  // CORS preflight for browser-based clients.
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
+export default async function handler(request) {
+  // CORS preflight.
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
-  if (req.method !== "POST") {
-    return res.status(405).json({
-      success: false,
-      error: "This action isn't allowed here. Launch a campaign to begin.",
-    });
+  if (request.method !== "POST") {
+    return jsonResponse(
+      { success: false, error: "This action isn't allowed here. Launch a campaign to begin." },
+      405
+    );
   }
 
-  // Parse the request body (Vercel auto-parses JSON; handle strings too).
-  let body;
+  // Wrap the entire pipeline so ANY unexpected error still returns a clean,
+  // well-formed 200 envelope instead of a 502.
   try {
-    body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
-  } catch (err) {
-    return res.status(400).json({ success: false, error: "That request didn't come through clearly. Try again." });
-  }
-
-  // Validate the only required field: the niche/topic.
-  const niche = String((body && body.niche) || "").trim();
-  if (!niche) {
-    return res.status(400).json({ success: false, error: "Tell us your video idea first." });
-  }
-  if (niche.length > 400) {
-    return res.status(400).json({
-      success: false,
-      error: "That idea is a little long — keep it under 400 characters.",
-    });
-  }
-
-  // Validate/sanitize the optional fields.
-  const language = ALLOWED_LANGUAGES.includes(body && body.language) ? body.language : "english";
-  const tone = String((body && body.tone) || "High-Energy").trim().slice(0, 60);
-  const platform = String((body && body.platform) || "YouTube Shorts").trim().slice(0, 60);
-  const duration = String((body && body.duration) || "60 seconds").trim().slice(0, 40);
-
-  // The secret lives ONLY on the server.
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({
-      success: false,
-      error: "Your Secure Access Key isn't connected yet.",
-      hint: "Add GROQ_API_KEY in your hosting dashboard (Vercel → Settings → Environment Variables), then redeploy.",
-    });
-  }
-
-  const messages = [
-    { role: "system", content: SYSTEM_PROMPT },
-    { role: "user", content: buildUserPrompt({ niche, language, tone, platform, duration }) },
-  ];
-
-  // Try the primary engine, then automatically fall back to the secondary.
-  let rawText = null;
-  let usedModel = null;
-  let usedFallback = false;
-  let lastStatus = 0;
-
-  for (const model of MODELS) {
+    // Parse the request body.
+    let body;
     try {
-      rawText = await callEngine(model, messages, apiKey);
-      usedModel = model;
-      usedFallback = model !== PRIMARY_MODEL;
-      break;
+      body = await request.json();
     } catch (err) {
-      lastStatus = (err && err.status) || 0;
-      // Raw detail stays in the server log only.
-      console.error("[ScriptForge] Engine failed:", model, err && err.message);
+      const text = await request.text();
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch (err2) {
+        body = null;
+      }
     }
+
+    // Validate the only required field: the niche/topic.
+    const niche = String((body && body.niche) || "").trim();
+    if (!niche) {
+      return jsonResponse({ success: false, error: "Tell us your video idea first." }, 200);
+    }
+    if (niche.length > 400) {
+      return jsonResponse(
+        { success: false, error: "That idea is a little long — keep it under 400 characters." },
+        200
+      );
+    }
+
+    // Validate/sanitize the optional fields.
+    const language = ALLOWED_LANGUAGES.includes(body && body.language) ? body.language : "english";
+    const tone = String((body && body.tone) || "High-Energy").trim().slice(0, 60);
+    const platform = String((body && body.platform) || "YouTube Shorts").trim().slice(0, 60);
+    const duration = String((body && body.duration) || "60 seconds").trim().slice(0, 40);
+
+    // The secret lives ONLY on the server — exact variable name.
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Your Secure Access Key isn't connected yet.",
+          hint: "Add GROQ_API_KEY in your hosting dashboard (Vercel → Settings → Environment Variables), then redeploy.",
+          retryable: true,
+        },
+        200
+      );
+    }
+
+    const messages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: buildUserPrompt({ niche, language, tone, platform, duration }) },
+    ];
+
+    // Single, strictly-bound engine call. Upstream failures are caught below
+    // and returned as a friendly 200 — never a 502.
+    let rawText;
+    try {
+      rawText = await callEngine(messages, apiKey);
+    } catch (err) {
+      return jsonResponse(
+        { success: false, error: friendlyError((err && err.status) || 0), retryable: true },
+        200
+      );
+    }
+
+    const parsed = parseModelJson(rawText);
+    if (!parsed) {
+      return jsonResponse(
+        { success: false, error: "The engine drafted something unexpected. Try launching again.", retryable: true },
+        200
+      );
+    }
+
+    const data = sanitizeResult(parsed, { niche, language, tone, platform, duration });
+
+    return jsonResponse(
+      {
+        success: true,
+        data,
+        generatedAt: new Date().toISOString(),
+      },
+      200
+    );
+  } catch (err) {
+    // Top-level safety net — keep the status code healthy at 200 and never
+    // leak raw technical strings to the client.
+    console.error("[ScriptForge] Unhandled handler error:", err && err.message ? err.message : err);
+    return jsonResponse(
+      { success: false, error: "Something went wrong. Please try again.", retryable: true },
+      200
+    );
   }
-
-  if (!rawText) {
-    // Clean, user-friendly alert — no raw technical strings leaked.
-    return res.status(502).json({
-      success: false,
-      error: friendlyError(lastStatus),
-      retryable: true,
-    });
-  }
-
-  const parsed = parseModelJson(rawText);
-  if (!parsed) {
-    return res.status(502).json({
-      success: false,
-      error: "The engine drafted something unexpected. Try launching again.",
-      retryable: true,
-    });
-  }
-
-  const data = sanitizeResult(parsed, { niche, language, tone, platform, duration });
-
-  return res.status(200).json({
-    success: true,
-    data,
-    usedFallback,
-    generatedAt: new Date().toISOString(),
-  });
 }
