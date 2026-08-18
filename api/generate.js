@@ -4,57 +4,62 @@
  *  File: api/generate.js
  * ----------------------------------------------------------------------------
  *  ROLE
- *    1. Performs the OpenRouter API handshake 100% server-side so the
- *       OPENROUTER_API_KEY never reaches the browser (no key leakage).
- *    2. Routes requests across an active 2026 free-model grid with automatic
- *       failover, so a discontinued or rate-limited node never kills a request.
- *    3. Forces the model to return a single raw JSON object containing a
+ *    1. Runs the OpenRouter handshake 100% server-side so the Secure Access
+ *       Key never reaches the browser.
+ *    2. Powers the SMART-CORE FAILOVER engine: if a content engine returns an
+ *       HTTP error (404, 401, 429, 5xx…), the request silently moves to the
+ *       next engine in the chain without ever breaking the creator's flow.
+ *    3. Forces the engine to return a single raw JSON object containing a
  *       virality score, 3 hooks, 3 titles, a scene-by-scene script and
- *       high-ranking SEO metadata.
- *    4. Doubles as a lightweight status endpoint (GET) so the client can
- *       render the "API Gateway Profiles" and "System Performance" panels
- *       without ever exposing the secret.
+ *       ranking-ready description copy with 10 hashtags.
+ *    4. Serves a lightweight status call (GET) so the client can render the
+ *       Creator Studio panels without ever exposing the secret.
  *
- *  ACTIVE MODEL GRID (2026)
- *    PRIMARY  : nvidia/llama-3.1-nemotron-70b-instruct:free
- *    FAILOVER : meta-llama/llama-3.1-8b-instruct:free
- *    FAILOVER : google/gemma-2-9b-it:free
+ *  SMART-CORE FAILOVER CHAIN
+ *    LEAD      : nvidia/llama-3.1-nemotron-70b-instruct:free
+ *    BACKUP    : meta-llama/llama-3.1-8b-instruct:free
+ *    BACKUP    : google/gemma-2-9b-it:free
+ *    DYNAMIC   : openrouter/free  ← default fallback; routes to any active
+ *                                  free model OpenRouter has live right now
  *
- *  DEPLOYMENT
- *    Lives at /api/generate.js and deploys automatically as a serverless
- *    function. The API key is read from process.env.OPENROUTER_API_KEY —
- *    set it in the Vercel Dashboard under Settings → Environment Variables,
- *    then redeploy. An optional APP_URL is sent as the OpenRouter HTTP-Referer.
+ *  ACCESS KEY
+ *    Read from process.env.OPENROUTER_API_KEY first, then the friendly aliases
+ *    SECURE_ACCESS_KEY and INTEGRATION_TOKEN. Set any of these in the Vercel
+ *    Dashboard → Settings → Environment Variables, then redeploy.
  *
  *  SECURITY MODEL
  *    • No secrets are ever hard-coded in the client bundle.
  *    • This function is the only code path that talks to OpenRouter.
- *    • Inputs are validated and sanitized before they touch the model.
- *    • The model's raw output is parsed and re-shaped defensively so the
- *      frontend only ever receives a known-good structure.
+ *    • Inputs are validated and sanitized before they touch an engine.
+ *    • Engine output is parsed and re-shaped defensively so the frontend only
+ *      ever receives a known-good structure.
  * ============================================================================
  */
 
 // ----------------------------------------------------------------------------
-// Configuration
+// Smart-Core configuration
 // ----------------------------------------------------------------------------
 
-/** Primary router target — highest quality free instruct model. */
-const PRIMARY_MODEL = "nvidia/llama-3.1-nemotron-70b-instruct:free";
+/** Lead content engine — highest quality free instruct model. */
+const LEAD_ENGINE = "nvidia/llama-3.1-nemotron-70b-instruct:free";
 
-/**
- * Automated failover array — tried in order if the primary fails.
- * Both nodes are active free models as of 2026.
- */
-const FAILOVER_MODELS = [
+/** Backup engines — tried in order if the lead engine errors out. */
+const BACKUP_ENGINES = [
   "meta-llama/llama-3.1-8b-instruct:free",
   "google/gemma-2-9b-it:free",
 ];
 
-/** The complete routing order used by the handler. */
-const ROUTE = [PRIMARY_MODEL, ...FAILOVER_MODELS];
+/**
+ * Dynamic default fallback. "openrouter/free" lets OpenRouter route the
+ * request to whatever free engine is operational at that moment, so a
+ * discontinued or busy node can never take the studio offline.
+ */
+const DYNAMIC_ENGINE = "openrouter/free";
 
-/** OpenRouter chat completions endpoint. */
+/** The complete routing order used by the Smart-Core handler. */
+const ROUTE = [LEAD_ENGINE, ...BACKUP_ENGINES, DYNAMIC_ENGINE];
+
+/** OpenRouter completions URL. */
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 /** Request timeout in ms — stays safely under Vercel's function cap. */
@@ -63,7 +68,7 @@ const REQUEST_TIMEOUT_MS = 55000;
 /** Allowed language identifiers (matches the frontend toggle). */
 const ALLOWED_LANGUAGES = ["english", "hinglish", "urdu"];
 
-/** Human-readable language labels injected into the model prompt. */
+/** Human-readable language labels injected into the engine prompt. */
 const LANGUAGE_LABELS = {
   english: "English",
   hinglish: "Hinglish (natural Hindi + English mix written in Roman/Latin script)",
@@ -71,7 +76,7 @@ const LANGUAGE_LABELS = {
 };
 
 // ----------------------------------------------------------------------------
-// System prompt — the complete contract with the model
+// System prompt — the complete contract with the engine
 // ----------------------------------------------------------------------------
 
 const SYSTEM_PROMPT = `You are ScriptForge AI, an elite short-form video strategist and viral scriptwriter whose scripts have generated hundreds of millions of views. You understand the psychology of the scroll: the first 1.5 seconds decide whether a video lives or dies.
@@ -149,7 +154,7 @@ function buildUserPrompt({ niche, language, tone, platform, duration }) {
   ].join("\n");
 }
 
-/** Strips markdown code fences the model may have wrapped around the JSON. */
+/** Strips markdown code fences the engine may have wrapped around the JSON. */
 function stripCodeFences(text) {
   return String(text || "")
     .trim()
@@ -159,9 +164,9 @@ function stripCodeFences(text) {
 }
 
 /**
- * Parses the model output into an object. Tries a direct parse first, then
- * falls back to extracting the first balanced { ... } block, so minor stray
- * text around the JSON does not break the pipeline.
+ * Parses engine output into an object. Tries a direct parse first, then falls
+ * back to extracting the first balanced { ... } block, so minor stray text
+ * around the JSON does not break the pipeline.
  */
 function parseModelJson(text) {
   const cleaned = stripCodeFences(text);
@@ -183,7 +188,7 @@ function parseModelJson(text) {
 }
 
 /**
- * Re-shapes the raw model output into a guaranteed-safe structure so the
+ * Re-shapes raw engine output into a guaranteed-safe structure so the
  * frontend never has to guess about missing or malformed fields.
  */
 function sanitizeResult(raw, meta) {
@@ -245,37 +250,40 @@ function sanitizeResult(raw, meta) {
   };
 }
 
-/** Human-readable guidance for common upstream HTTP statuses. */
+/**
+ * Creator-friendly guidance for common upstream statuses. Smart-Core normally
+ * handles these silently; this copy is only shown if EVERY engine fails.
+ */
 function hintForStatus(status) {
   switch (status) {
     case 401:
-      return "The OPENROUTER_API_KEY was rejected (401). Regenerate your key at openrouter.ai/keys and update the Vercel environment variable, then redeploy.";
+      return "Your Secure Access Key was rejected. Regenerate it in your account and reconnect it.";
     case 402:
-      return "The OpenRouter account has no available credits (402). Top up the account or switch to a free-tier plan.";
+      return "Your account needs credit to run. Top up and launch again.";
     case 403:
-      return "Access denied (403). This key may not be authorized for the requested model.";
+      return "The engines declined access. Smart-Core tried every one — reconnect your key and retry.";
     case 404:
-      return "A model endpoint returned 404 — that node has been discontinued. This app already targets active free models; report this so the grid can be updated.";
+      return "An engine went offline. Smart-Core already switched, but every engine was down this time — retry in a moment.";
     case 408:
     case 504:
-      return "The upstream model timed out. Free models can be slow under heavy load — retry in a few seconds.";
+      return "The engines took too long to answer. Give it a few seconds and launch again.";
     case 429:
-      return "OpenRouter's free-tier global rate limit was hit (429). Wait ~30 seconds and retry, or add a funded key to remove the cap.";
+      return "The free engines are at capacity right now. Wait a moment and launch again.";
     case 500:
     case 502:
     case 503:
-      return `OpenRouter is having upstream issues (HTTP ${status}). Retry shortly.`;
+      return `The engines hit a snag (HTTP ${status}). Smart-Core will retry — just launch again.`;
     default:
-      return `Unexpected upstream response (HTTP ${status}). Retry in a moment.`;
+      return `Something unexpected happened (HTTP ${status}). Try again in a moment.`;
   }
 }
 
 /**
- * Calls a single model on OpenRouter and returns the assistant message
+ * Calls a single engine on OpenRouter and returns the assistant message
  * content. Throws a descriptive error (with `.status`) on any failure so the
- * caller can decide whether to continue down the failover array.
+ * Smart-Core loop can silently move to the next engine.
  */
-async function callModel(model, messages, apiKey) {
+async function callEngine(engineId, messages, apiKey) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -289,7 +297,7 @@ async function callModel(model, messages, apiKey) {
         "X-Title": "ScriptForge AI",
       },
       body: JSON.stringify({
-        model,
+        model: engineId,
         messages,
         temperature: 0.85,
         top_p: 0.95,
@@ -323,7 +331,7 @@ async function callModel(model, messages, apiKey) {
       payload.choices[0].message &&
       payload.choices[0].message.content;
     if (!content) {
-      throw new Error("OpenRouter returned an empty completion.");
+      throw new Error("The engine returned an empty draft.");
     }
     return content;
   } catch (err) {
@@ -342,7 +350,7 @@ async function callModel(model, messages, apiKey) {
 // Vercel function configuration + handler
 // ----------------------------------------------------------------------------
 
-/** Ask Vercel for a longer execution window (free models can be slow). */
+/** Ask Vercel for a longer execution window (free engines can be slow). */
 export const maxDuration = 60;
 
 export default async function handler(req, res) {
@@ -353,32 +361,39 @@ export default async function handler(req, res) {
     return res.status(204).end();
   }
 
+  // Resolve the Secure Access Key (canonical + friendly aliases).
+  const apiKey =
+    process.env.OPENROUTER_API_KEY ||
+    process.env.SECURE_ACCESS_KEY ||
+    process.env.INTEGRATION_TOKEN ||
+    "";
+
   // --------------------------------------------------------------------------
-  // GET — gateway status / routing profile (no secrets exposed).
-  // Used by the client's "API Gateway Profiles" and "System Performance" tabs.
+  // GET — Creator Studio status (no secrets exposed).
   // --------------------------------------------------------------------------
   if (req.method === "GET") {
     return res.status(200).json({
       success: true,
-      service: "ScriptForge AI — OpenRouter Gateway",
-      keyConfigured: Boolean(process.env.OPENROUTER_API_KEY),
-      models: ROUTE.map((id) => ({
+      service: "ScriptForge AI — Content Engine",
+      accessKeyConnected: Boolean(apiKey),
+      smartCore: true,
+      engines: ROUTE.map((id) => ({
         id,
-        role: id === PRIMARY_MODEL ? "primary" : "failover",
+        role: id === LEAD_ENGINE ? "lead" : id === DYNAMIC_ENGINE ? "dynamic" : "backup",
       })),
-      maxDurationSeconds: maxDuration,
+      responseWindowSeconds: maxDuration,
     });
   }
 
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
-      error: "Method Not Allowed. Use POST to generate, or GET for gateway status.",
+      error: "This action isn't allowed here. Launch a campaign to begin.",
     });
   }
 
   // --------------------------------------------------------------------------
-  // POST — generation
+  // POST — campaign launch
   // --------------------------------------------------------------------------
 
   // Parse the request body (Vercel auto-parses JSON; handle strings too).
@@ -386,18 +401,18 @@ export default async function handler(req, res) {
   try {
     body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
   } catch (err) {
-    return res.status(400).json({ success: false, error: "Invalid JSON body." });
+    return res.status(400).json({ success: false, error: "That request didn't come through clearly. Try again." });
   }
 
   // Validate the only required field: the niche/topic.
   const niche = String((body && body.niche) || "").trim();
   if (!niche) {
-    return res.status(400).json({ success: false, error: "The 'niche' field is required." });
+    return res.status(400).json({ success: false, error: "Tell us your video idea first." });
   }
   if (niche.length > 400) {
     return res.status(400).json({
       success: false,
-      error: "The 'niche' field is too long (max 400 characters).",
+      error: "That idea is a little long — keep it under 400 characters.",
     });
   }
 
@@ -408,12 +423,11 @@ export default async function handler(req, res) {
   const duration = String((body && body.duration) || "60 seconds").trim().slice(0, 40);
 
   // The secret lives ONLY on the server.
-  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return res.status(500).json({
       success: false,
-      error: "OPENROUTER_API_KEY is not configured on the server.",
-      hint: "Add it in Vercel → Settings → Environment Variables, then redeploy.",
+      error: "Your Secure Access Key isn't connected yet.",
+      hint: "Add it in your hosting dashboard (Vercel → Settings → Environment Variables) as OPENROUTER_API_KEY, SECURE_ACCESS_KEY, or INTEGRATION_TOKEN — then redeploy.",
     });
   }
 
@@ -422,32 +436,34 @@ export default async function handler(req, res) {
     { role: "user", content: buildUserPrompt({ niche, language, tone, platform, duration }) },
   ];
 
-  // Try the primary model, then cascade down the failover array.
+  // Smart-Core failover: try the lead engine, then backups, then the dynamic
+  // fallback. Every failure is logged and skipped silently — the creator only
+  // ever sees the final result.
   let rawText = null;
-  let usedModel = null;
-  let usedFallback = false;
+  let usedEngine = null;
+  let usedBackup = false;
   let lastStatus = 0;
   const attempts = [];
 
-  for (const model of ROUTE) {
+  for (const engine of ROUTE) {
     try {
-      rawText = await callModel(model, messages, apiKey);
-      usedModel = model;
-      usedFallback = model !== PRIMARY_MODEL;
-      attempts.push({ model, status: 200 });
+      rawText = await callEngine(engine, messages, apiKey);
+      usedEngine = engine;
+      usedBackup = engine !== LEAD_ENGINE;
+      attempts.push({ engine, status: 200 });
       break;
     } catch (err) {
       lastStatus = (err && err.status) || 0;
-      const message = (err && err.message) || "Unknown upstream error";
-      attempts.push({ model, status: lastStatus, error: message });
+      const message = (err && err.message) || "Unknown engine error";
+      attempts.push({ engine, status: lastStatus, error: message });
     }
   }
 
   if (!rawText) {
     return res.status(502).json({
       success: false,
-      error: `All ${ROUTE.length} configured models failed to respond.`,
-      detail: attempts.map((a) => `${a.model} → ${a.error || "HTTP " + a.status}`).join(" | "),
+      error: "Every engine is busy right now. Give it a moment and launch again.",
+      detail: attempts.map((a) => `${a.engine} → ${a.error || "HTTP " + a.status}`).join(" | "),
       hint: hintForStatus(lastStatus),
       attempts,
     });
@@ -457,7 +473,7 @@ export default async function handler(req, res) {
   if (!parsed) {
     return res.status(502).json({
       success: false,
-      error: "The model returned output that could not be parsed as JSON.",
+      error: "The engine drafted something unexpected. Try launching again.",
       detail: stripCodeFences(rawText).slice(0, 400),
     });
   }
@@ -467,8 +483,8 @@ export default async function handler(req, res) {
   return res.status(200).json({
     success: true,
     data,
-    model: usedModel,
-    usedFallback,
+    engine: usedEngine,
+    usedBackup,
     attempts,
     generatedAt: new Date().toISOString(),
   });
