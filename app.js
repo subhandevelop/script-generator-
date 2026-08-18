@@ -1,13 +1,16 @@
 /* ============================================================================
    ScriptForge AI — app.js
    Frontend state management, secure campaign launching, platform brand
-   theming, sliding dashboard sidebar (History / Performance / Creator Studio),
-   and all interactive outputs (virality meter, copy utilities, history).
+   theming, sliding History drawer, and all interactive outputs (virality
+   meter, hooks, titles, script, thumbnail, engagement kit, series ideas,
+   keywords & hashtags, copy utilities, history).
    ----------------------------------------------------------------------------
    SECURITY NOTES
    • The Secure Access Key is NEVER present in this file. All engine traffic
-     goes through the Vercel serverless function at /api/generate.
+     goes through the Vercel serverless function at /api/generate (Groq).
    • All engine/user text is HTML-escaped before injection to prevent XSS.
+   • Error cards show ONLY clean, user-friendly messages — the backend never
+     returns raw technical strings, and this file never renders them either.
    • No third-party trackers. History & telemetry live only in localStorage.
    ========================================================================== */
 
@@ -36,29 +39,6 @@
     "Instagram Reels": { a: "#f9ce34", b: "#ee2a7b" },
     "LinkedIn": { a: "#0077b5", b: "#00A0DC" },
   };
-
-  // Friendly display names for the Smart-Core engine chain.
-  var ENGINE_LABELS = {
-    "nvidia/llama-3.1-nemotron-70b-instruct:free": "Nemotron 70B",
-    "meta-llama/llama-3.1-8b-instruct:free": "Llama 3.1 8B",
-    "google/gemma-2-9b-it:free": "Gemma 2 9B",
-    "openrouter/free": "Smart-Core Free",
-  };
-
-  var ROLE_LABELS = {
-    lead: "Lead Engine",
-    backup: "Backup Engine",
-    dynamic: "Dynamic Fallback",
-  };
-
-  // Offline mirror of the Smart-Core chain. Used only for display when the
-  // studio is unreachable (static preview); live server data takes precedence.
-  var ENGINE_MIRROR = [
-    { id: "nvidia/llama-3.1-nemotron-70b-instruct:free", role: "lead" },
-    { id: "meta-llama/llama-3.1-8b-instruct:free", role: "backup" },
-    { id: "google/gemma-2-9b-it:free", role: "backup" },
-    { id: "openrouter/free", role: "dynamic" },
-  ];
 
   // ---------------------------------------------------------------------------
   // DEMO CAMPAIGN — used ONLY when the user explicitly clicks "Load demo
@@ -127,9 +107,20 @@
         dialogue: "The full 21-day plan drops tomorrow. Follow now so you don't miss part two.",
       },
     ],
+    caption: "No gym, no equipment, just 5 minutes. Save this for tomorrow morning 💪",
+    thumbnailText: "Lose Belly Fat in 5 Minutes",
+    callToAction: "Follow for the full 21-day plan",
+    bestPostTime: "Weekdays, 7–9 PM",
+    audience: "Busy moms who want results without a gym",
+    seriesIdeas: [
+      "The 5-Minute Arms Routine You Can Do Anywhere",
+      "What I Eat in a Day for Lean Energy",
+      "The Dead Bug Mistake Costing You Results",
+    ],
     metadata: {
       description:
         "Lose belly fat in 5 minutes a day with these 3 no-equipment moves built for busy moms. No gym, no crunches — just science-backed core activation. Save this and start today.",
+      keywords: ["belly fat workout", "5 minute core", "no equipment abs", "mom fitness", "home workout"],
       hashtags: [
         "#shorts", "#viral", "#fyp", "#fitmom", "#homeworkout", "#bellyfat",
         "#coreworkout", "#weightlossjourney", "#momlife", "#noequipment",
@@ -149,7 +140,6 @@
     language: "english",
     current: null,
     loading: false,
-    studio: null, // GET /api/generate response (Smart-Core chain)
   };
 
   // ---------------------------------------------------------------------------
@@ -174,7 +164,14 @@
   var hooksList = $("hooksList");
   var titlesList = $("titlesList");
   var scriptList = $("scriptList");
+  var thumbnailText = $("thumbnailText");
+  var captionText = $("captionText");
+  var ctaText = $("ctaText");
+  var bestTimeText = $("bestTimeText");
+  var audienceText = $("audienceText");
+  var seriesList = $("seriesList");
   var metadataDesc = $("metadataDesc");
+  var keywordsList = $("keywordsList");
   var hashtagsList = $("hashtagsList");
   var copyAllBtn = $("copyAllBtn");
   var toastEl = $("toast");
@@ -187,20 +184,15 @@
   var historySearch = $("historySearch");
   var historyList = $("historyList");
   var clearHistoryBtn = $("clearHistoryBtn");
-  var metricsGrid = $("metricsGrid");
-  var studioStatus = $("studioStatus");
-  var refreshStudioBtn = $("refreshStudioBtn");
-  var studioList = $("studioList");
-  var keyCard = $("keyCard");
+  var openHistoryLink = $("openHistoryLink");
 
-  // Header status pill
-  var headerStatus = $("headerStatus");
-  var headerStatusText = $("headerStatusText");
+  // Stats band
+  var statCampaigns = $("statCampaigns");
+  var statSuccess = $("statSuccess");
 
   // Fine-tune fold
   var foldPanel = $("foldPanel");
   var foldHead = $("foldHead");
-  var foldBody = $("foldBody");
 
   // ---------------------------------------------------------------------------
   // Utilities
@@ -351,7 +343,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Sliding sidebar
+  // Sliding sidebar (history)
   // ---------------------------------------------------------------------------
   function openSidebar() {
     sidebar.classList.add("open");
@@ -372,23 +364,8 @@
     document.body.style.overflow = "";
   }
 
-  function switchTab(tabName) {
-    var tabs = document.querySelectorAll(".sidebar-tabs .stab");
-    Array.prototype.forEach.call(tabs, function (t) {
-      var active = t.getAttribute("data-tab") === tabName;
-      t.classList.toggle("active", active);
-      t.setAttribute("aria-selected", active ? "true" : "false");
-    });
-    var panels = document.querySelectorAll(".tab-panel");
-    Array.prototype.forEach.call(panels, function (p) {
-      p.hidden = p.getAttribute("data-panel") !== tabName;
-    });
-    if (tabName === "performance") renderPerformance();
-    if (tabName === "studio") renderStudio();
-  }
-
   // ---------------------------------------------------------------------------
-  // Telemetry (localStorage)
+  // Telemetry (localStorage) — drives the homepage stats band
   // ---------------------------------------------------------------------------
   function defaultTelemetry() {
     return {
@@ -396,10 +373,6 @@
       successes: 0,
       stumbles: 0,
       totalMs: 0,
-      lastEngine: null,
-      lastBackup: false,
-      lastIssue: null,
-      lastAt: null,
     };
   }
 
@@ -407,26 +380,7 @@
     try {
       var raw = localStorage.getItem(TELEMETRY_KEY);
       var parsed = raw ? JSON.parse(raw) : null;
-      if (parsed && typeof parsed === "object") {
-        // Migrate older keys to the friendly names.
-        if (typeof parsed.campaigns === "undefined" && typeof parsed.generations !== "undefined") {
-          parsed.campaigns = parsed.generations;
-        }
-        if (typeof parsed.stumbles === "undefined" && typeof parsed.failures !== "undefined") {
-          parsed.stumbles = parsed.failures;
-        }
-        if (typeof parsed.lastEngine === "undefined" && typeof parsed.lastModel !== "undefined") {
-          parsed.lastEngine = parsed.lastModel;
-        }
-        if (typeof parsed.lastIssue === "undefined" && typeof parsed.lastError !== "undefined") {
-          parsed.lastIssue = parsed.lastError;
-        }
-        if (typeof parsed.lastBackup === "undefined" && typeof parsed.lastFallback !== "undefined") {
-          parsed.lastBackup = parsed.lastFallback;
-        }
-        return parsed;
-      }
-      return defaultTelemetry();
+      return parsed && typeof parsed === "object" ? parsed : defaultTelemetry();
     } catch (err) {
       return defaultTelemetry();
     }
@@ -440,173 +394,33 @@
     }
   }
 
-  function recordSuccess(engine, usedBackup, ms) {
+  function recordSuccess(ms) {
     var t = loadTelemetry();
     t.campaigns += 1;
     t.successes += 1;
     t.totalMs += Math.max(0, ms || 0);
-    t.lastEngine = engine || null;
-    t.lastBackup = !!usedBackup;
-    t.lastIssue = null;
-    t.lastAt = new Date().toISOString();
     saveTelemetry(t);
+    renderStats();
   }
 
-  function recordStumble(errMsg) {
+  function recordStumble() {
     var t = loadTelemetry();
     t.campaigns += 1;
     t.stumbles += 1;
-    t.lastIssue = errMsg || "Unknown issue";
-    t.lastAt = new Date().toISOString();
     saveTelemetry(t);
+    renderStats();
   }
 
-  function storageUsageKB() {
-    try {
-      var total = 0;
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        total += (k.length + (localStorage.getItem(k) || "").length) * 2;
-      }
-      return (total / 1024).toFixed(1);
-    } catch (err) {
-      return "0.0";
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Creator Studio status (GET /api/generate)
-  // ---------------------------------------------------------------------------
-  function fetchStudioStatus() {
-    return fetch("/api/generate", { method: "GET", cache: "no-store" })
-      .then(function (res) {
-        return res.text().then(function (text) {
-          var json = null;
-          try { json = text ? JSON.parse(text) : null; } catch (err) { json = null; }
-          if (!res.ok || !json || !json.success) throw new Error("studio unreachable");
-          return json;
-        });
-      })
-      .then(function (json) {
-        state.studio = json;
-        renderHeaderStatus();
-        renderPerformance();
-        renderStudio();
-        return json;
-      })
-      .catch(function () {
-        state.studio = null;
-        renderHeaderStatus();
-        renderPerformance();
-        renderStudio();
-        return null;
-      });
-  }
-
-  function renderHeaderStatus() {
-    headerStatus.classList.remove("ok", "warn");
-    if (state.studio) {
-      if (state.studio.accessKeyConnected) {
-        headerStatus.classList.add("ok");
-        headerStatusText.textContent = "Engines ready";
-      } else {
-        headerStatus.classList.add("warn");
-        headerStatusText.textContent = "Add Secure Access Key";
-      }
-    } else {
-      headerStatusText.textContent = "Preview mode";
-    }
-  }
-
-  function renderPerformance() {
+  function renderStats() {
     var t = loadTelemetry();
     var total = t.campaigns || 0;
-    var successRate = total ? Math.round((t.successes / total) * 100) : 0;
-    var avgMs = t.successes ? Math.round(t.totalMs / t.successes) : null;
-    var avgSec = avgMs == null ? "—" : (avgMs / 1000).toFixed(1) + "s";
-
-    var tiles = [
-      { label: "Campaigns", value: String(total) },
-      { label: "Success", value: successRate + "%" },
-      { label: "Avg speed", value: avgSec },
-      { label: "Storage", value: storageUsageKB() + " KB" },
-      { label: "Last engine", value: t.lastEngine ? (ENGINE_LABELS[t.lastEngine] || t.lastEngine) : "—", small: true },
-      { label: "Backup used", value: t.lastBackup ? "Yes" : "No" },
-    ];
-
-    metricsGrid.innerHTML = tiles.map(function (m) {
-      return (
-        '<div class="metric-tile">' +
-          '<span class="metric-label">' + esc(m.label) + "</span>" +
-          '<span class="metric-value' + (m.small ? " small" : "") + '">' + esc(m.value) + "</span>" +
-        "</div>"
-      );
-    }).join("");
-
-    if (state.studio) {
-      var lastIssue = t.lastIssue
-        ? '<div class="row"><span class="k">Last stumble</span><span class="v">' + esc(String(t.lastIssue).slice(0, 90)) + "</span></div>"
-        : "";
-      studioStatus.innerHTML =
-        '<div class="row"><span class="k">Content Engine</span><span class="v">' + esc(state.studio.service || "ScriptForge AI — Content Engine") + "</span></div>" +
-        '<div class="row"><span class="k">Secure Access Key</span><span class="v">' + (state.studio.accessKeyConnected ? '<span class="badge-ok">Connected</span>' : '<span class="badge-no">Not connected</span>') + "</span></div>" +
-        '<div class="row"><span class="k">Engines online</span><span class="v">' + esc(String((state.studio.engines || []).length)) + "</span></div>" +
-        '<div class="row"><span class="k">Response window</span><span class="v">' + esc(String(state.studio.responseWindowSeconds)) + "s</span></div>" +
-        lastIssue;
-    } else {
-      studioStatus.innerHTML =
-        '<div class="row"><span class="k">Studio</span><span class="v"><span class="badge-no">Offline</span></span></div>' +
-        '<div class="row"><span class="k">Next step</span><span class="v">Connect your Secure Access Key to go live.</span></div>';
-    }
-  }
-
-  function renderStudio() {
-    var engines = state.studio && state.studio.engines && state.studio.engines.length
-      ? state.studio.engines
-      : ENGINE_MIRROR;
-    var t = loadTelemetry();
-
-    studioList.innerHTML = engines.map(function (e) {
-      var live = t.lastEngine === e.id;
-      var label = ENGINE_LABELS[e.id] || e.id;
-      var roleLabel = ROLE_LABELS[e.role] || "Engine";
-      return (
-        '<div class="engine-card' + (live ? " current" : "") + '">' +
-          '<div class="engine-top">' +
-            '<span class="engine-name">' + esc(label) + "</span>" +
-            '<span class="role-badge role-' + esc(e.role) + '">' + esc(roleLabel) + "</span>" +
-          "</div>" +
-          '<div class="engine-status' + (live ? " live" : "") + '">' +
-            '<span class="dot"></span>' +
-            (live
-              ? "Served your last campaign"
-              : (e.role === "lead"
-                  ? "Handles every launch first"
-                  : e.role === "dynamic"
-                    ? "Catches anything that stumbles"
-                    : "Steps in automatically")) +
-            '<span class="free">FREE</span>' +
-          "</div>" +
-        "</div>"
-      );
-    }).join("");
-
-    if (state.studio) {
-      keyCard.innerHTML =
-        '<div class="row"><span class="k">Secure Access Key</span><span class="v">' +
-        (state.studio.accessKeyConnected ? '<span class="badge-ok">Connected</span>' : '<span class="badge-no">Not connected</span>') +
-        "</span></div>" +
-        '<div class="row"><span class="k">Routing</span><span class="v">Handled securely server-side</span></div>' +
-        '<div class="row"><span class="k">Your key</span><span class="v">Never leaves the server</span></div>';
-    } else {
-      keyCard.innerHTML =
-        '<div class="row"><span class="k">Studio</span><span class="v"><span class="badge-no">Offline</span></span></div>' +
-        '<div class="row"><span class="k">Engine list</span><span class="v">Offline preview</span></div>';
-    }
+    var rate = total ? Math.round((t.successes / total) * 100) + "%" : "—";
+    statCampaigns.textContent = String(total);
+    statSuccess.textContent = rate;
   }
 
   // ---------------------------------------------------------------------------
-  // Loading / skeleton / notice states
+  // Loading / skeleton / clean alert states
   // ---------------------------------------------------------------------------
   function setLoading(loading) {
     state.loading = loading;
@@ -641,14 +455,18 @@
       '</div>';
   }
 
-  function renderNotice(title, message, detail) {
+  /**
+   * CLEAN alert card — shows only a friendly title + message. Never renders
+   * raw technical strings (the backend already filters them out; this layer
+   * deliberately drops any remaining detail for failure cases).
+   */
+  function renderNotice(title, message) {
     statusArea.hidden = false;
     outputSection.hidden = true;
     statusArea.innerHTML =
       '<div class="glass card status-card">' +
         '<div class="status-title">' + esc(title) + '</div>' +
         '<p class="status-msg">' + esc(message) + '</p>' +
-        (detail ? '<p class="status-detail">' + esc(detail) + '</p>' : "") +
         '<div class="status-actions">' +
           '<button type="button" class="btn-copy" id="retryBtn">↻ Try again</button>' +
           '<button type="button" class="btn-copy" id="demoBtn">Load demo campaign</button>' +
@@ -703,8 +521,8 @@
           var json = null;
           try { json = text ? JSON.parse(text) : null; } catch (err) { json = null; }
           if (!res.ok || !json || !json.success) {
-            var err = new Error((json && json.error) || "That didn't go through (HTTP " + res.status + ").");
-            err.detail = (json && (json.detail || json.hint)) || null;
+            var err = new Error("launch_failed");
+            err.friendly = (json && json.error) || "Something went wrong. Please try again.";
             err.notDeployed = (res.status === 404 || res.status === 405);
             throw err;
           }
@@ -715,33 +533,28 @@
         state.current = json.data;
         renderOutput(state.current);
         pushHistory(state.current);
-        recordSuccess(json.engine, json.usedBackup, Date.now() - startedAt);
+        recordSuccess(Date.now() - startedAt);
         clearStatus();
-        renderPerformance();
-        renderStudio();
         window.scrollTo({ top: 0, behavior: "smooth" });
-        toast(json.usedBackup ? "A backup engine stepped in automatically." : "Campaign ready 🎉");
+        toast("Campaign ready 🎉");
       })
       .catch(function (err) {
-        recordStumble(err.message || "Launch failed");
-        renderPerformance();
+        recordStumble();
         if (err instanceof TypeError) {
+          // Network failure (static preview / no connection).
           renderNotice(
             "Connection lost",
-            "We couldn't reach the studio. Check your connection and try again.",
-            "You can still explore with a demo campaign."
+            "We couldn't reach the studio. Check your connection and try again."
           );
         } else if (err.notDeployed) {
           renderNotice(
             "Studio offline",
-            "This workspace isn't connected to a live engine yet.",
-            "Connect it and launch again. Explore with a demo campaign meanwhile."
+            "This workspace isn't connected to a live engine yet. Connect it and launch again."
           );
         } else {
           renderNotice(
-            err.message || "Something went sideways",
-            "Give it a moment and launch again.",
-            err.detail || null
+            "That didn't go through",
+            err.friendly || "Something went wrong. Please try again."
           );
         }
       })
@@ -808,14 +621,39 @@
       );
     }).join("");
 
-    // Description & hashtags
+    // Thumbnail + caption
+    thumbnailText.textContent = data.thumbnailText || "Your video deserves a bold thumbnail";
+    captionText.textContent = data.caption || "";
+
+    // Engagement kit
+    ctaText.textContent = data.callToAction || "—";
+    bestTimeText.textContent = data.bestPostTime || "—";
+    audienceText.textContent = data.audience || "—";
+
+    // Series ideas
+    seriesList.innerHTML = (data.seriesIdeas || []).map(function (idea, i) {
+      return (
+        '<li class="hook-item">' +
+          '<span class="hook-num">' + (i + 1) + "</span>" +
+          '<span class="hook-text">' + esc(idea) + "</span>" +
+        "</li>"
+      );
+    }).join("");
+
+    // Description + keywords + hashtags
     metadataDesc.textContent = data.metadata.description || "";
+    keywordsList.innerHTML = (data.metadata.keywords || []).map(function (k) {
+      return '<span class="keyword">' + esc(k) + "</span>";
+    }).join("");
     hashtagsList.innerHTML = (data.metadata.hashtags || []).map(function (h) {
       return '<span class="hashtag">' + esc(h) + "</span>";
     }).join("");
 
     // RTL for Urdu/Hindi native-script output
-    ["hooksList", "titlesList", "scriptList", "metadataDesc"].forEach(function (id) {
+    [
+      "hooksList", "titlesList", "scriptList", "thumbnailText", "captionText",
+      "seriesList", "metadataDesc",
+    ].forEach(function (id) {
       $(id).classList.toggle("rtl", rtl);
       $(id).setAttribute("dir", rtl ? "rtl" : "ltr");
     });
@@ -908,8 +746,21 @@
     out.push("── SCRIPT ──");
     out.push(formatScript(data));
     out.push("");
+    out.push("── THUMBNAIL & CAPTION ──");
+    out.push("Thumbnail: " + (data.thumbnailText || ""));
+    out.push("Caption: " + (data.caption || ""));
+    out.push("");
+    out.push("── ENGAGEMENT KIT ──");
+    out.push("Call to action: " + (data.callToAction || ""));
+    out.push("Best time to post: " + (data.bestPostTime || ""));
+    out.push("Audience: " + (data.audience || ""));
+    out.push("");
+    out.push("── NEXT VIDEO IDEAS ──");
+    (data.seriesIdeas || []).forEach(function (s, i) { out.push((i + 1) + ") " + s); });
+    out.push("");
     out.push("── DESCRIPTION & HASHTAGS ──");
     out.push("Description: " + (data.metadata.description || ""));
+    out.push("Keywords: " + (data.metadata.keywords || []).join(", "));
     out.push("Hashtags: " + (data.metadata.hashtags || []).join(" "));
     return out.join("\n");
   }
@@ -927,8 +778,17 @@
         var s = (d.script && d.script[Number(match[1])]);
         return s ? formatScript({ script: [s] }) : "";
       case "script": return formatScript(d);
+      case "thumb":
+        return "Thumbnail: " + (d.thumbnailText || "") + "\nCaption: " + (d.caption || "");
+      case "kit":
+        return "Call to action: " + (d.callToAction || "") +
+          "\nBest time to post: " + (d.bestPostTime || "") +
+          "\nAudience: " + (d.audience || "");
+      case "series": return (d.seriesIdeas || []).map(function (s, i) { return (i + 1) + ". " + s; }).join("\n");
       case "metadata":
-        return "Description: " + (d.metadata.description || "") + "\nHashtags: " + (d.metadata.hashtags || []).join(" ");
+        return "Description: " + (d.metadata.description || "") +
+          "\nKeywords: " + (d.metadata.keywords || []).join(", ") +
+          "\nHashtags: " + (d.metadata.hashtags || []).join(" ");
       case "all": return formatCampaign(d);
       default: return "";
     }
@@ -966,7 +826,7 @@
     try {
       localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_LIMIT)));
     } catch (err) {
-      /* storage full or unavailable (private mode) — degrade gracefully */
+      /* storage full or unavailable — degrade gracefully */
     }
   }
 
@@ -1087,6 +947,14 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Smooth scroll helper for nav links
+  // ---------------------------------------------------------------------------
+  function scrollToTarget(selector) {
+    var el = document.querySelector(selector);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // ---------------------------------------------------------------------------
   // Event wiring
   // ---------------------------------------------------------------------------
   function init() {
@@ -1118,20 +986,23 @@
     });
     sidebarClose.addEventListener("click", closeSidebar);
     sidebarBackdrop.addEventListener("click", closeSidebar);
-
-    document.querySelectorAll(".sidebar-tabs .stab").forEach(function (tab) {
-      tab.addEventListener("click", function () {
-        switchTab(tab.getAttribute("data-tab"));
+    if (openHistoryLink) {
+      openHistoryLink.addEventListener("click", function (e) {
+        e.preventDefault();
+        openSidebar();
       });
-    });
+    }
 
     historySearch.addEventListener("input", function () {
       renderHistory(historySearch.value);
     });
     clearHistoryBtn.addEventListener("click", clearHistory);
-    refreshStudioBtn.addEventListener("click", function () {
-      toast("Refreshing studio status…");
-      fetchStudioStatus();
+
+    // Smooth-scroll for all [data-scroll] buttons/links.
+    document.querySelectorAll("[data-scroll]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        scrollToTarget(el.getAttribute("data-scroll"));
+      });
     });
 
     // Delegated clicks for copy buttons and history actions.
@@ -1166,7 +1037,7 @@
     applyBrand(platformSelect.value);
     updateCharCount();
     renderHistory("");
-    fetchStudioStatus();
+    renderStats();
   }
 
   // Boot when the DOM is ready (script is loaded at end of body anyway).

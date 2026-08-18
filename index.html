@@ -40,11 +40,11 @@
   <div class="stars" aria-hidden="true"></div>
 
   <!-- ============================================================ -->
-  <!-- SLIDING DASHBOARD SIDEBAR (off-screen by default)             -->
+  <!-- SLIDING SIDEBAR — History only (off-screen by default)        -->
   <!-- ============================================================ -->
   <div class="backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
-  <aside class="sidebar" id="sidebar" aria-label="Dashboard" aria-hidden="true">
+  <aside class="sidebar" id="sidebar" aria-label="History" aria-hidden="true">
     <div class="sidebar-head">
       <div class="sidebar-brand">
         <svg class="logo-svg small" viewBox="0 0 48 48" fill="none" aria-hidden="true">
@@ -59,67 +59,35 @@
           <circle cx="24" cy="24" r="8.5" fill="#050507" />
           <path d="M27 10 L17.5 26 h6.2 L22 38 L32.5 21 h-6.6 L27 10 Z" fill="#FFFFFF" />
         </svg>
-        <span class="sidebar-title">ScriptForge <span class="brand-badge">AI</span></span>
+        <span class="sidebar-title">Your History</span>
       </div>
-      <button type="button" class="sidebar-close" id="sidebarClose" aria-label="Close dashboard">✕</button>
+      <button type="button" class="sidebar-close" id="sidebarClose" aria-label="Close">✕</button>
     </div>
 
-    <!-- Tabs -->
-    <nav class="sidebar-tabs" role="tablist" aria-label="Dashboard sections">
-      <button type="button" class="stab active" data-tab="history" role="tab" aria-selected="true">
-        <span class="stab-ico">📜</span> History
-      </button>
-      <button type="button" class="stab" data-tab="performance" role="tab" aria-selected="false">
-        <span class="stab-ico">📈</span> Performance
-      </button>
-      <button type="button" class="stab" data-tab="studio" role="tab" aria-selected="false">
-        <span class="stab-ico">⚙️</span> Creator Studio
-      </button>
-    </nav>
-
-    <!-- Panels -->
     <div class="sidebar-body">
-      <!-- History -->
-      <section class="tab-panel" data-panel="history" role="tabpanel">
-        <div class="search-box">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
-            <path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-          </svg>
-          <input type="search" id="historySearch" placeholder="Search your campaigns…" autocomplete="off" />
-        </div>
-        <div class="hist-list" id="historyList"></div>
-        <button type="button" class="btn-text" id="clearHistoryBtn">🗑 Clear history</button>
-      </section>
-
-      <!-- Performance -->
-      <section class="tab-panel" data-panel="performance" role="tabpanel" hidden>
-        <div class="metrics-grid" id="metricsGrid"></div>
-        <div class="studio-card" id="studioStatus"></div>
-        <button type="button" class="btn-refresh" id="refreshStudioBtn">↻ Refresh status</button>
-      </section>
-
-      <!-- Creator Studio -->
-      <section class="tab-panel" data-panel="studio" role="tabpanel" hidden>
-        <div class="studio-title">Smart-Core Failover</div>
-        <p class="studio-sub">If one engine stumbles, another steps in. Instantly.</p>
-        <div class="engines-list" id="studioList"></div>
-        <div class="studio-card" id="keyCard"></div>
-      </section>
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" />
+          <path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <input type="search" id="historySearch" placeholder="Search your campaigns…" autocomplete="off" />
+      </div>
+      <div class="hist-list" id="historyList"></div>
+      <button type="button" class="btn-text" id="clearHistoryBtn">🗑 Clear history</button>
     </div>
   </aside>
 
   <!-- ============================================================ -->
-  <!-- STICKY HEADER                                                -->
+  <!-- STICKY HEADER — big SaaS nav                                 -->
   <!-- ============================================================ -->
   <header class="site-header">
     <div class="container header-inner">
       <div class="header-left">
-        <button type="button" class="burger" id="burgerBtn" aria-label="Open dashboard menu" aria-expanded="false" aria-controls="sidebar">
+        <button type="button" class="burger" id="burgerBtn" aria-label="Open history" aria-expanded="false" aria-controls="sidebar">
           <span></span><span></span><span></span>
         </button>
 
-        <a class="brand" href="#" aria-label="ScriptForge AI home">
+        <a class="brand" href="#top" aria-label="ScriptForge AI home">
           <!-- Glowing neon violet gear + lightning bolt logo -->
           <svg class="logo-svg" viewBox="0 0 48 48" fill="none" aria-hidden="true">
             <defs>
@@ -151,28 +119,43 @@
         </a>
       </div>
 
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+
       <div class="header-right">
-        <span class="status-pill" id="headerStatus">
-          <span class="pill-dot" id="pillDot"></span>
-          <span id="headerStatusText">Starting…</span>
-        </span>
+        <button type="button" class="btn btn-nav" data-scroll="#studio">Launch Campaign</button>
       </div>
     </div>
   </header>
 
   <!-- ============================================================ -->
-  <!-- MAIN — single focused column                                 -->
+  <!-- HERO                                                         -->
+  <!-- ============================================================ -->
+  <section class="hero" id="top">
+    <span class="hero-badge">⭐ Rated 4.9 · Loved by 120,000+ creators</span>
+    <h1>Viral videos, <span class="grad-text">written in seconds.</span></h1>
+    <p class="hero-sub">Drop a topic. Get hooks, titles, and a shoot-ready script — instantly.</p>
+    <div class="hero-cta">
+      <button type="button" class="btn btn-hero" data-scroll="#studio">
+        Start creating free
+      </button>
+      <a class="btn btn-ghost" href="#how">See how it works</a>
+    </div>
+    <div class="hero-proof">
+      <span class="proof-item">🎬 2.4M scripts drafted</span>
+      <span class="proof-item">🌍 3 languages</span>
+      <span class="proof-item">💸 Free forever</span>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- MAIN STUDIO                                                  -->
   <!-- ============================================================ -->
   <main class="container narrow">
-
-    <!-- Hero -->
-    <section class="hero">
-      <h1>Viral videos, <span class="grad-text">written in seconds.</span></h1>
-      <p class="hero-sub">Drop a topic. Get hooks, titles, and a shoot-ready script.</p>
-    </section>
-
-    <!-- Generator card -->
-    <section class="glass card generator-card" aria-label="Campaign studio">
+    <section class="glass card generator-card" id="studio" aria-label="Campaign studio">
 
       <!-- The star of the show: one big idea field -->
       <div class="field-group">
@@ -252,7 +235,7 @@
       </div>
     </section>
 
-    <!-- Status area (skeleton / notice) -->
+    <!-- Status area (skeleton / clean alert) -->
     <section id="statusArea" class="status-wrap" hidden></section>
 
     <!-- ============================================================ -->
@@ -313,13 +296,55 @@
         <div class="scene-list" id="scriptList"></div>
       </div>
 
-      <!-- Description & hashtags -->
+      <!-- Thumbnail & Caption -->
+      <div class="glass card block-card fade-up">
+        <div class="block-head">
+          <h3><span class="block-icon">🖼️</span> Thumbnail &amp; Caption</h3>
+          <button type="button" class="btn-copy" data-copy="thumb">Copy</button>
+        </div>
+        <div class="thumb-box" id="thumbnailText"></div>
+        <p class="caption-text" id="captionText"></p>
+      </div>
+
+      <!-- Engagement kit -->
+      <div class="glass card block-card fade-up">
+        <div class="block-head">
+          <h3><span class="block-icon">⚡</span> Engagement Kit</h3>
+          <button type="button" class="btn-copy" data-copy="kit">Copy</button>
+        </div>
+        <div class="kit-grid">
+          <div class="kit-item">
+            <span class="kit-lbl">📣 Call to action</span>
+            <span class="kit-val" id="ctaText"></span>
+          </div>
+          <div class="kit-item">
+            <span class="kit-lbl">🕐 Best time to post</span>
+            <span class="kit-val" id="bestTimeText"></span>
+          </div>
+          <div class="kit-item">
+            <span class="kit-lbl">🎯 Audience</span>
+            <span class="kit-val" id="audienceText"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Series ideas -->
+      <div class="glass card block-card fade-up">
+        <div class="block-head">
+          <h3><span class="block-icon">🎞️</span> Next Video Ideas</h3>
+          <button type="button" class="btn-copy" data-copy="series">Copy</button>
+        </div>
+        <ol class="hook-list" id="seriesList"></ol>
+      </div>
+
+      <!-- Description, keywords & hashtags -->
       <div class="glass card block-card fade-up">
         <div class="block-head">
           <h3><span class="block-icon">🧲</span> Description &amp; Hashtags</h3>
           <button type="button" class="btn-copy" data-copy="metadata">Copy</button>
         </div>
         <p class="meta-desc" id="metadataDesc"></p>
+        <div class="keywords" id="keywordsList"></div>
         <div class="hashtags" id="hashtagsList"></div>
       </div>
 
@@ -330,24 +355,156 @@
     </section>
   </main>
 
-  <!-- Footer -->
-  <footer class="site-footer">
-    <div class="footer-brand">
-      <svg class="logo-svg mini" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="lgVioletFt" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#7C3AED" />
-            <stop offset="0.55" stop-color="#A855F7" />
-            <stop offset="1" stop-color="#E879F9" />
-          </linearGradient>
-        </defs>
-        <circle cx="24" cy="24" r="14" fill="url(#lgVioletFt)" />
-        <circle cx="24" cy="24" r="8.5" fill="#050507" />
-        <path d="M27 10 L17.5 26 h6.2 L22 38 L32.5 21 h-6.6 L27 10 Z" fill="#FFFFFF" />
-      </svg>
-      <span>ScriptForge <span class="brand-badge">AI</span></span>
+  <!-- ============================================================ -->
+  <!-- FEATURES                                                     -->
+  <!-- ============================================================ -->
+  <section class="container wide section" id="features">
+    <div class="section-heading">
+      <h2>Everything you need to <span class="grad-text">go viral</span></h2>
+      <p>One campaign. Every asset. Zero guesswork.</p>
     </div>
-    <p>Your ideas deserve an audience.</p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <span class="feature-icon">🎣</span>
+        <h3>Scroll-stopping hooks</h3>
+        <p>Three openings engineered to hold attention past the first second.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🎬</span>
+        <h3>Shoot-ready script</h3>
+        <p>Scene by scene — shots, audio, captions and dialogue. Just press record.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🖼️</span>
+        <h3>Thumbnail &amp; caption</h3>
+        <p>Packaging that earns the click before the video even plays.</p>
+      </div>
+      <div class="feature-card">
+        <span class="feature-icon">🧲</span>
+        <h3>Rank-ready metadata</h3>
+        <p>Keywords, description and hashtags tuned for each platform's search.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- HOW IT WORKS                                                -->
+  <!-- ============================================================ -->
+  <section class="container wide section" id="how">
+    <div class="section-heading">
+      <h2>Three steps. <span class="grad-text">Thirty seconds.</span></h2>
+      <p>From idea to full campaign, faster than you can open your camera.</p>
+    </div>
+    <div class="steps-grid">
+      <div class="step-card">
+        <span class="step-num">1</span>
+        <h3>Drop your idea</h3>
+        <p>One sentence is all it takes.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num">2</span>
+        <h3>Fine-tune it</h3>
+        <p>Pick platform, tone and length.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num">3</span>
+        <h3>Launch &amp; copy</h3>
+        <p>Get a full campaign in seconds.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- YOUR STATS (local) + FAQ                                     -->
+  <!-- ============================================================ -->
+  <section class="container wide section" id="stats">
+    <div class="stats-band">
+      <div class="stat">
+        <span class="stat-value" id="statCampaigns">0</span>
+        <span class="stat-label">Campaigns launched</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="statSuccess">—</span>
+        <span class="stat-label">Success rate</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">3</span>
+        <span class="stat-label">Languages</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">$0</span>
+        <span class="stat-label">Forever</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="container narrow section" id="faq">
+    <div class="section-heading">
+      <h2>Questions? <span class="grad-text">Answered.</span></h2>
+    </div>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>Is ScriptForge really free?</summary>
+        <p>Yes. Every generation runs on free engines — no credit card, no trial, no surprise fees.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Which platforms does it support?</summary>
+        <p>YouTube Shorts, TikTok, Instagram Reels and LinkedIn — each with its own tone and pacing.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Can I write in Hinglish or Urdu?</summary>
+        <p>Yes. Pick English, Hinglish, or Urdu/Hindi native script before you launch.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Where are my campaigns saved?</summary>
+        <p>On your device only. Nothing leaves your browser — your history is private.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- FOOTER                                                       -->
+  <!-- ============================================================ -->
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div class="footer-col brand-col">
+        <div class="footer-brand">
+          <svg class="logo-svg mini" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="lgVioletFt" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#7C3AED" />
+                <stop offset="0.55" stop-color="#A855F7" />
+                <stop offset="1" stop-color="#E879F9" />
+              </linearGradient>
+            </defs>
+            <circle cx="24" cy="24" r="14" fill="url(#lgVioletFt)" />
+            <circle cx="24" cy="24" r="8.5" fill="#050507" />
+            <path d="M27 10 L17.5 26 h6.2 L22 38 L32.5 21 h-6.6 L27 10 Z" fill="#FFFFFF" />
+          </svg>
+          <span>ScriptForge <span class="brand-badge">AI</span></span>
+        </div>
+        <p>Your ideas deserve an audience.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#studio">Launch a campaign</a>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <a href="#faq">FAQ</a>
+        <a href="#stats">Your stats</a>
+        <a href="#" id="openHistoryLink">History</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="#top">About</a>
+        <a href="#top">Privacy</a>
+        <a href="#top">Terms</a>
+      </div>
+    </div>
+    <p class="footer-bottom">© 2026 ScriptForge AI. Built for creators.</p>
   </footer>
 
   <!-- Toast host -->
