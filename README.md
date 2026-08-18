@@ -12,8 +12,9 @@ kit, series ideas, keywords, and 10 hashtags — all with a virality score.
 - **Backend** — secure Vercel serverless function running every engine call
   server-side on **Groq Cloud**, so your Secure Access Key never reaches the
   browser.
-- **Engine** — `llama-3.3-70b-versatile` with automatic fallback to
-  `llama-3.1-8b-instant`.
+- **Engine** — `llama-3.1-8b-instant` (fast, ~2–3s per draft) running on
+  Vercel's **Edge Runtime**, so the 10-second serverless gateway limit can
+  never cut off the response.
 
 ---
 
@@ -21,10 +22,11 @@ kit, series ideas, keywords, and 10 hashtags — all with a virality score.
 
 ```
 ├── api/
-│   └── generate.js       # Vercel serverless Node.js backend (Groq engine)
+│   └── generate.js       # Vercel Edge Function (Groq engine, OpenAI-compatible)
 ├── index.html            # Big-SaaS landing + studio UI
 ├── style.css             # Obsidian design system + marketing layer
 ├── app.js                # State, theming, sidebar, secure launching
+├── vercel.json           # Enables edge runtime + max duration for the API route
 └── README.md             # Setup and deployment documentation
 ```
 
@@ -84,23 +86,30 @@ Browser (app.js)  ──POST /api/generate──▶  Vercel Function (api/genera
 
 ## ⚙️ Engine configuration
 
-| Role | Engine | Plan |
-| --- | --- | --- |
-| Primary | `llama-3.3-70b-versatile` | Free |
-| Fallback | `llama-3.1-8b-instant` | Free |
+| Engine | Plan |
+| --- | --- |
+| `llama-3.1-8b-instant` (strictly bound) | Free |
 
 Requests are sent to Groq's official OpenAI-compatible endpoint
 `https://api.groq.com/openai/v1/chat/completions` with a standard payload:
 
 ```json
 {
-  "model": "llama-3.3-70b-versatile",
+  "model": "llama-3.1-8b-instant",
   "messages": [{ "role": "system", "content": "…" }, { "role": "user", "content": "…" }],
   "temperature": 0.85,
   "top_p": 0.95,
-  "max_tokens": 3000
+  "max_tokens": 1200
 }
 ```
+
+- `max_tokens` is capped at **1200** so the completion loop finishes in ~2–3s.
+- The route runs on the **Edge Runtime** (`export const runtime = 'edge'` in
+  `api/generate.js` + `vercel.json`), which is not subject to the 10-second
+  serverless gateway limit.
+- Every launch returns a clean **HTTP 200** envelope — `{ success: true, data }`
+  on success, or `{ success: false, error, retryable }` when an upstream network
+  or rate-limit exception occurs — so the UI never sees a raw 502.
 
 If the primary returns an HTTP error (401, 404, 429, 5xx…), the request
 **silently** moves to the fallback engine. Only if both fail does the studio
@@ -239,9 +248,9 @@ you can explore the full UI offline.
 
 | Symptom | Fix |
 | --- | --- |
-| "Your Secure Access Key isn't connected yet." | Add `GROQ_API_KEY` in Vercel → Settings → Environment Variables → redeploy. |
+| "Your Secure Access Key isn't connected yet." | Add `GROQ_API_KEY` (exact name) in Vercel → Settings → Environment Variables → redeploy. |
 | "We're getting a lot of requests right now." | Groq's rate limit — wait a few seconds and launch again. |
-| "The draft took too long." | Retry; or reduce the target video length. |
+| Function times out (504) | Confirm `vercel.json` deployed (edge runtime) and the env var is exactly `GROQ_API_KEY`. |
 | "Connection lost" in the browser | You opened the file as a static page — deploy to Vercel or run `vercel dev`. |
 
 ---
