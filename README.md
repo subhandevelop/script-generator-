@@ -1,15 +1,17 @@
-# ⚡ ScriptForge AI — Viral Content Script Generator
+# ⚡ ScriptForge AI — Viral Campaign Studio
 
-A premium, fully automated **Content Script Generator SaaS** web app. Paste a
-niche, pick a platform, and get a complete, ready-to-shoot campaign — 3
-high-retention hooks, 3 viral titles, a scene-by-scene script with visual/audio
-directions, a virality score, and high-ranking SEO metadata with 10 hashtags.
+Drop a topic. Get hooks, titles, and a shoot-ready script in seconds.
 
-- **Frontend** — luxury cosmic-midnight SPA (glassmorphism, neon violet brand,
+A premium, fully automated **viral campaign studio**. Paste an idea, pick a
+platform, and ScriptForge drafts a complete campaign — 3 high-retention hooks,
+3 viral titles, a scene-by-scene script with visual & audio directions, a
+virality score, and ranking-ready description copy with 10 hashtags.
+
+- **Frontend** — obsidian dark-mode SPA (glassmorphism, neon violet brand,
   sliding dashboard sidebar), optimized for Android WebView / APK conversion.
-- **Backend** — secure Vercel serverless function that proxies OpenRouter so the
-  API key never reaches the browser.
-- **Model grid** — active 2026 free models with automatic failover.
+- **Backend** — secure Vercel serverless function that runs every engine call
+  server-side, so your Secure Access Key never reaches the browser.
+- **Smart-Core Failover** — if one engine stumbles, another steps in. Instantly.
 
 ---
 
@@ -17,10 +19,10 @@ directions, a virality score, and high-ranking SEO metadata with 10 hashtags.
 
 ```
 ├── api/
-│   └── generate.js       # Vercel serverless Node.js backend (OpenRouter proxy)
-├── index.html            # Luxury responsive frontend UI
-├── style.css             # Cosmic-midnight design system + sidebar
-├── app.js                # State, theming, sidebar, secure API fetching
+│   └── generate.js       # Vercel serverless Node.js backend (Smart-Core router)
+├── index.html            # Minimalist premium frontend UI
+├── style.css             # Obsidian design system + sidebar + fold panel
+├── app.js                # State, theming, sidebar, secure launching
 └── README.md             # Setup and deployment documentation
 ```
 
@@ -33,7 +35,7 @@ directions, a virality score, and high-ranking SEO metadata with 10 hashtags.
 1. Push this folder to a GitHub repo (keep the structure exactly as shown above).
 2. Go to [vercel.com](https://vercel.com) → **Add New → Project** → import the repo.
 3. Vercel auto-detects the `api/` folder. Keep all default build settings.
-4. Add the secret env var (see below), then click **Deploy**.
+4. Add your Secure Access Key (see below), then click **Deploy**.
 
 ### Option B — Vercel CLI
 
@@ -44,17 +46,20 @@ vercel env add OPENROUTER_API_KEY   # paste your key
 vercel --prod     # deploy to production
 ```
 
-### 🔑 Environment variables (Vercel Dashboard → Settings → Environment Variables)
+### 🔑 Secure Access Key (Vercel → Settings → Environment Variables)
 
-| Variable              | Required | Description                                                              |
-| --------------------- | -------- | ------------------------------------------------------------------------ |
-| `OPENROUTER_API_KEY`  | ✅ Yes   | Your OpenRouter API key. Used **only** server-side in `api/generate.js`. |
-| `APP_URL`             | Optional | Your deployed URL, sent as `HTTP-Referer` for OpenRouter's leaderboard.  |
+The key is read **only** server-side in `api/generate.js`. Any of these names
+work — set one and redeploy:
 
-After adding a variable, **redeploy** so the function picks it up.
+| Variable              | Required | Notes                                                            |
+| --------------------- | -------- | ---------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`  | ✅ Yes   | Canonical name (recommended).                                    |
+| `SECURE_ACCESS_KEY`   | Optional | Friendly alias — same value.                                     |
+| `INTEGRATION_TOKEN`   | Optional | Friendly alias — same value.                                     |
+| `APP_URL`             | Optional | Your deployed URL, sent as the referral source.                  |
 
-> 🆓 Get a key at [openrouter.ai/keys](https://openrouter.ai/keys). The three
-> configured models are **free**, so generations cost `$0`.
+> 🆓 Get a key at [openrouter.ai/keys](https://openrouter.ai/keys). Every engine
+> in the Smart-Core chain is **free**, so campaigns cost `$0`.
 
 ---
 
@@ -63,61 +68,66 @@ After adding a variable, **redeploy** so the function picks it up.
 ```
 Browser (app.js)  ──POST /api/generate──▶  Vercel Function (api/generate.js)
                                               │
-                                              │  Bearer $OPENROUTER_API_KEY
+                                              │  Bearer $SECURE_ACCESS_KEY
                                               ▼
-                                         OpenRouter API
+                                         OpenRouter Engines
 ```
 
-- `app.js` never holds or calls any API key — it only posts the niche and
-  options to `/api/generate`.
-- The key is read from `process.env.OPENROUTER_API_KEY` at request time, which
-  maps 1:1 to the Vercel Dashboard environment variables.
-- A `GET /api/generate` status call returns the routing profile (model grid,
-  key-configured flag, max duration) **without ever exposing the secret** — it
-  powers the in-app "API Gateway Profiles" and "System Performance" panels.
-- All model output is parsed and re-shaped server-side into a known-good JSON
+- `app.js` never holds or calls any key — it only posts the idea and options.
+- The key is read at request time from `process.env.OPENROUTER_API_KEY` (with
+  `SECURE_ACCESS_KEY` / `INTEGRATION_TOKEN` aliases), matching Vercel's
+  dashboard environment variables 1:1.
+- A `GET /api/generate` status call returns the Smart-Core chain (engines,
+  key-connected flag, response window) **without ever exposing the secret** —
+  it powers the in-app Creator Studio and Performance panels.
+- All engine output is parsed and re-shaped server-side into a known-good JSON
   structure, then HTML-escaped again on the client to prevent XSS.
 - CORS is enabled for browser clients; only `POST`, `GET`, and `OPTIONS` are
   allowed.
 
 ---
 
-## 🤖 Active model grid (2026)
+## ⚙️ Smart-Core Failover chain
 
-Routing lives in `api/generate.js`:
-
-| Role | Model | Plan |
+| Role | Engine | Plan |
 | --- | --- | --- |
-| Primary | `nvidia/llama-3.1-nemotron-70b-instruct:free` | Free |
-| Failover 1 | `meta-llama/llama-3.1-8b-instruct:free` | Free |
-| Failover 2 | `google/gemma-2-9b-it:free` | Free |
+| Lead | `nvidia/llama-3.1-nemotron-70b-instruct:free` | Free |
+| Backup | `meta-llama/llama-3.1-8b-instruct:free` | Free |
+| Backup | `google/gemma-2-9b-it:free` | Free |
+| Dynamic | `openrouter/free` | Free |
 
-Requests try the primary first, then cascade down the failover array. Every
-attempt is logged; if all nodes fail, the response includes a descriptive
-message and a targeted hint (401 invalid key, 402 no credits, 404 discontinued
-node, 429 free-tier global rate limit, 408/504 timeout, 5xx upstream).
+Every launch tries the **Lead** engine first. If it returns an HTTP error (404,
+401, 429, 5xx…), the request **silently** moves down the chain to the next
+engine — the creator never sees an interruption. The final `openrouter/free`
+entry is the dynamic default: it routes to whatever free engine OpenRouter has
+live at that moment, so a discontinued node can never take the studio offline.
+
+Only if *every* engine fails does the studio show a friendly note, with a
+creator-friendly hint (invalid key, no credit, engines busy, etc.).
 
 ---
 
-## 📡 API contract
+## 📡 Launch contract
 
-**`GET /api/generate`** — gateway status (no secrets):
+**`GET /api/generate`** — studio status (no secrets):
 
 ```json
 {
   "success": true,
-  "service": "ScriptForge AI — OpenRouter Gateway",
-  "keyConfigured": true,
-  "models": [
-    { "id": "nvidia/llama-3.1-nemotron-70b-instruct:free", "role": "primary" },
-    { "id": "meta-llama/llama-3.1-8b-instruct:free", "role": "failover" },
-    { "id": "google/gemma-2-9b-it:free", "role": "failover" }
+  "service": "ScriptForge AI — Content Engine",
+  "accessKeyConnected": true,
+  "smartCore": true,
+  "engines": [
+    { "id": "nvidia/llama-3.1-nemotron-70b-instruct:free", "role": "lead" },
+    { "id": "meta-llama/llama-3.1-8b-instruct:free", "role": "backup" },
+    { "id": "google/gemma-2-9b-it:free", "role": "backup" },
+    { "id": "openrouter/free", "role": "dynamic" }
   ],
-  "maxDurationSeconds": 60
+  "responseWindowSeconds": 60
 }
 ```
 
-**`POST /api/generate`** — generation.
+**`POST /api/generate`** — launch a campaign.
 
 Request body:
 
@@ -146,9 +156,9 @@ Response:
     "metadata": { "description": "…", "hashtags": ["#…", "…"] },
     "niche": "…", "language": "english", "tone": "…", "platform": "…", "duration": "…"
   },
-  "model": "nvidia/llama-3.1-nemotron-70b-instruct:free",
-  "usedFallback": false,
-  "attempts": [{ "model": "…", "status": 200 }],
+  "engine": "nvidia/llama-3.1-nemotron-70b-instruct:free",
+  "usedBackup": false,
+  "attempts": [{ "engine": "…", "status": 200 }],
   "generatedAt": "2026-08-17T00:00:00.000Z"
 }
 ```
@@ -161,23 +171,26 @@ Response:
 | --- | --- |
 | Neon violet gear + bolt inline SVG logo | `index.html` header / sidebar / footer |
 | Platform brand palettes (TikTok, YouTube, Instagram, LinkedIn) | `app.js` → `PLATFORM_BRANDS` + `applyBrand()` |
-| Glowing platform indicator lamp + branded generate button | `#brandLamp`, `--brand-1/--brand-2` CSS vars |
-| Sliding dashboard sidebar (burger → panel) | `#sidebar`, `#burgerBtn` in `app.js` |
+| Glowing platform lamp + branded launch button | `#brandLamp`, `--brand-1/--brand-2` CSS vars |
+| Single-focus input + one high-energy CTA | `.generator-card` |
+| Collapsible fine-tune panel (language, platform, tone, length) | `#foldPanel` + `toggleFold()` |
+| Sliding dashboard sidebar | `#sidebar`, `#burgerBtn` |
 | History tab with live search | `#historySearch` + `renderHistory()` |
-| System Performance tab (live client + server metrics) | `renderPerformance()` |
-| API Gateway Profiles tab (model grid + key status) | `renderProfiles()` via `GET /api/generate` |
+| Performance tab (campaigns, success, speed, storage) | `renderPerformance()` |
+| Creator Studio tab (Smart-Core chain + key status) | `renderStudio()` via `GET /api/generate` |
+| Smart-Core Failover (lead → backup → dynamic) | `api/generate.js` → `ROUTE` |
 | Virality meter (animated SVG gauge + count-up) | `animateGauge()` |
 | Multi-language (English / Hinglish / Urdu–Hindi) | `#languageToggle` + system prompt |
-| Section copy + "Copy Whole Campaign" + "Copied ✓" | `handleCopy()` |
+| Section copy + "Copy Full Campaign" + "Copied ✓" | `handleCopy()` |
 | On-device history (view / reload / discard) | `localStorage` key `scriptforge.history.v1` |
-| Local telemetry (generations, success rate, latency) | `localStorage` key `scriptforge.telemetry.v1` |
+| Local telemetry (campaigns, success, latency) | `localStorage` key `scriptforge.telemetry.v1` |
 | Skeleton shimmer loading | `renderSkeleton()` |
 
 ---
 
 ## 🎨 Branding system
 
-The canvas is **cosmic midnight `#030712`** with a neon violet brand
+The canvas is **obsidian `#050507`** with a neon violet brand
 (`#7C3AED → #A855F7 → #E879F9`). Selecting a platform live-swaps the accent:
 
 | Platform | Palette |
@@ -187,16 +200,16 @@ The canvas is **cosmic midnight `#030712`** with a neon violet brand
 | Instagram Reels | Sunset `#f9ce34` → `#ee2a7b` |
 | LinkedIn | Corporate Blue `#0077b5` |
 
-The glowing lamp beside the platform selector, its focus ring, and the generate
+The glowing lamp beside the platform selector, its focus ring, and the launch
 button all adopt the selected platform's colors in real time.
 
 ---
 
 ## 📱 Android APK conversion (WebView)
 
-This SPA is built mobile-first (no horizontal scroll, `viewport-fit=cover`,
-touch-optimized inputs, `localStorage` history/telemetry, clipboard fallback via
-`document.execCommand`), so it wraps cleanly into a native app.
+Built mobile-first: no horizontal scroll, `viewport-fit=cover`, touch-optimized
+inputs, `localStorage` history/telemetry, and a clipboard fallback via
+`document.execCommand`.
 
 **Recommended — Capacitor:**
 
@@ -208,14 +221,9 @@ npx cap sync
 # open ./android with Android Studio → Build → APK
 ```
 
-Set the app to load your deployed Vercel URL. HTTPS is required for the
-Clipboard API — your Vercel `*.vercel.app` URL is already HTTPS.
-
-**Notes for WebView:**
-- Keep the page served over HTTPS so `navigator.clipboard` works; the
-  `execCommand` fallback covers older WebView builds.
-- The app works offline up to the point of generation, and the history ledger
-  plus telemetry work fully offline.
+Point the app at your deployed Vercel URL (HTTPS is required for the Clipboard
+API — `*.vercel.app` is already HTTPS). The history ledger and telemetry work
+fully offline.
 
 ---
 
@@ -227,16 +235,15 @@ npx serve .                 # static files
 python3 -m http.server 8000
 ```
 
-> Opening `index.html` directly (file://) will render the full UI, but
-> generation requires the serverless function — use `vercel dev` to run the
-> `/api/generate` endpoint locally:
+> Opening `index.html` directly renders the full UI, but launching requires the
+> serverless function — use `vercel dev` to run it locally:
 
 ```bash
-vercel dev        # serves both the SPA and the API at http://localhost:3000
+vercel dev        # serves the SPA and the /api/generate function on :3000
 ```
 
 Without a deployed backend, the app offers a **"Load demo campaign"** button so
-you can evaluate the full UI offline.
+you can explore the full UI offline.
 
 ---
 
@@ -244,11 +251,11 @@ you can evaluate the full UI offline.
 
 | Symptom | Fix |
 | --- | --- |
-| `OPENROUTER_API_KEY is not configured` | Add the env var in Vercel → Settings → Environment Variables → redeploy. |
-| `All … models failed to respond` + 429 hint | Free-tier global rate limit — wait ~30s and retry, or add a funded key. |
-| Function times out (504) | Upgrade Vercel plan for >10s function duration, or swap in a faster model. |
-| "Could not reach the server" in browser | You opened `index.html` as a static file — deploy to Vercel or run `vercel dev`. |
+| "Your Secure Access Key isn't connected yet." | Add the key in Vercel → Settings → Environment Variables → redeploy. |
+| "Every engine is busy right now." | Free engines are at capacity — wait a moment and launch again. |
+| Launch times out | Upgrade the Vercel plan for longer function duration, or use a faster engine. |
+| "Connection lost" in the browser | You opened the file as a static page — deploy to Vercel or run `vercel dev`. |
 
 ---
 
-Built for creators. Serverless, keyless on the client, and free to run. 🚀
+Built for creators. Your ideas deserve an audience. 🚀

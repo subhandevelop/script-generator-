@@ -1,13 +1,13 @@
 /* ============================================================================
    ScriptForge AI — app.js
-   Frontend state management, secure API fetching, platform brand theming,
-   sliding dashboard sidebar (history / performance / gateway profiles), and
-   all interactive outputs (virality meter, copy utilities, history ledger).
+   Frontend state management, secure campaign launching, platform brand
+   theming, sliding dashboard sidebar (History / Performance / Creator Studio),
+   and all interactive outputs (virality meter, copy utilities, history).
    ----------------------------------------------------------------------------
    SECURITY NOTES
-   • The OpenRouter API key is NEVER present in this file. All model traffic
+   • The Secure Access Key is NEVER present in this file. All engine traffic
      goes through the Vercel serverless function at /api/generate.
-   • All model/user text is HTML-escaped before injection to prevent XSS.
+   • All engine/user text is HTML-escaped before injection to prevent XSS.
    • No third-party trackers. History & telemetry live only in localStorage.
    ========================================================================== */
 
@@ -29,13 +29,7 @@
     urdu: "Urdu / Hindi",
   };
 
-  var LANG_HINTS = {
-    english: "Full output in natural English.",
-    hinglish: "Natural Hindi + English mix written in Roman/Latin script.",
-    urdu: "Output in the native script — اردو for Urdu audiences, हिन्दी for Hindi.",
-  };
-
-  // Authentic platform brand palettes (drives lamp, focus ring & button).
+  // Authentic platform brand palettes (drives lamp, focus ring & launch button).
   var PLATFORM_BRANDS = {
     "YouTube Shorts": { a: "#FF0000", b: "#FF5A5A" },
     "TikTok": { a: "#00f2fe", b: "#fe0979" },
@@ -43,20 +37,33 @@
     "LinkedIn": { a: "#0077b5", b: "#00A0DC" },
   };
 
-  // Client-side mirror of the server's model grid. Used only for display when
-  // the gateway is unreachable (static preview); live server data takes
-  // precedence whenever the GET status call succeeds.
-  var MODEL_MIRROR = [
-    { id: "nvidia/llama-3.1-nemotron-70b-instruct:free", role: "primary" },
-    { id: "meta-llama/llama-3.1-8b-instruct:free", role: "failover" },
-    { id: "google/gemma-2-9b-it:free", role: "failover" },
+  // Friendly display names for the Smart-Core engine chain.
+  var ENGINE_LABELS = {
+    "nvidia/llama-3.1-nemotron-70b-instruct:free": "Nemotron 70B",
+    "meta-llama/llama-3.1-8b-instruct:free": "Llama 3.1 8B",
+    "google/gemma-2-9b-it:free": "Gemma 2 9B",
+    "openrouter/free": "Smart-Core Free",
+  };
+
+  var ROLE_LABELS = {
+    lead: "Lead Engine",
+    backup: "Backup Engine",
+    dynamic: "Dynamic Fallback",
+  };
+
+  // Offline mirror of the Smart-Core chain. Used only for display when the
+  // studio is unreachable (static preview); live server data takes precedence.
+  var ENGINE_MIRROR = [
+    { id: "nvidia/llama-3.1-nemotron-70b-instruct:free", role: "lead" },
+    { id: "meta-llama/llama-3.1-8b-instruct:free", role: "backup" },
+    { id: "google/gemma-2-9b-it:free", role: "backup" },
+    { id: "openrouter/free", role: "dynamic" },
   ];
 
   // ---------------------------------------------------------------------------
   // DEMO CAMPAIGN — used ONLY when the user explicitly clicks "Load demo
-  // campaign" after the server is unreachable. It never participates in the
-  // live API flow; it exists so the full UI can be previewed offline / inside
-  // a WebView APK before the backend is wired up.
+  // campaign" after the studio is unreachable. It never participates in the
+  // live flow; it exists so the full UI can be previewed offline.
   // ---------------------------------------------------------------------------
   var DEMO_DATA = {
     viralityScore: 93,
@@ -142,7 +149,7 @@
     language: "english",
     current: null,
     loading: false,
-    gateway: null, // GET /api/generate response (routing profile)
+    studio: null, // GET /api/generate response (Smart-Core chain)
   };
 
   // ---------------------------------------------------------------------------
@@ -152,7 +159,6 @@
 
   var nicheInput = $("nicheInput");
   var charCount = $("charCount");
-  var langHint = $("langHint");
   var platformSelect = $("platformSelect");
   var toneSelect = $("toneSelect");
   var durationSelect = $("durationSelect");
@@ -182,14 +188,19 @@
   var historyList = $("historyList");
   var clearHistoryBtn = $("clearHistoryBtn");
   var metricsGrid = $("metricsGrid");
-  var gatewayStatus = $("gatewayStatus");
-  var refreshGatewayBtn = $("refreshGatewayBtn");
-  var profilesList = $("profilesList");
-  var keyStatus = $("keyStatus");
+  var studioStatus = $("studioStatus");
+  var refreshStudioBtn = $("refreshStudioBtn");
+  var studioList = $("studioList");
+  var keyCard = $("keyCard");
 
   // Header status pill
   var headerStatus = $("headerStatus");
   var headerStatusText = $("headerStatusText");
+
+  // Fine-tune fold
+  var foldPanel = $("foldPanel");
+  var foldHead = $("foldHead");
+  var foldBody = $("foldBody");
 
   // ---------------------------------------------------------------------------
   // Utilities
@@ -288,16 +299,9 @@
 
   /** Score → human verdict. */
   function verdictFor(score) {
-    if (score >= 91) return "Exceptional — this concept is primed to blow up. 🚀";
-    if (score >= 83) return "Strong viral potential — polish the hook and ship it. 🔥";
-    return "Solid foundation — tighten the first 3 seconds to unlock more reach. 📈";
-  }
-
-  /** Short display name for a model id. */
-  function shortModel(id) {
-    var s = String(id || "").replace(":free", "");
-    var parts = s.split("/");
-    return parts.length > 1 ? parts[1] : s;
+    if (score >= 91) return "Exceptional — this one's primed to blow up. 🚀";
+    if (score >= 83) return "Strong potential — polish the hook and ship it. 🔥";
+    return "Solid start — tighten the first 3 seconds. 📈";
   }
 
   // ---------------------------------------------------------------------------
@@ -335,7 +339,15 @@
       btn.classList.toggle("active", active);
       btn.setAttribute("aria-selected", active ? "true" : "false");
     });
-    langHint.textContent = LANG_HINTS[lang] || "";
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fine-tune fold
+  // ---------------------------------------------------------------------------
+  function toggleFold(force) {
+    var open = typeof force === "boolean" ? force : !foldPanel.classList.contains("open");
+    foldPanel.classList.toggle("open", open);
+    foldHead.setAttribute("aria-expanded", open ? "true" : "false");
   }
 
   // ---------------------------------------------------------------------------
@@ -372,7 +384,7 @@
       p.hidden = p.getAttribute("data-panel") !== tabName;
     });
     if (tabName === "performance") renderPerformance();
-    if (tabName === "profiles") renderProfiles();
+    if (tabName === "studio") renderStudio();
   }
 
   // ---------------------------------------------------------------------------
@@ -380,13 +392,13 @@
   // ---------------------------------------------------------------------------
   function defaultTelemetry() {
     return {
-      generations: 0,
+      campaigns: 0,
       successes: 0,
-      failures: 0,
+      stumbles: 0,
       totalMs: 0,
-      lastModel: null,
-      lastFallback: false,
-      lastError: null,
+      lastEngine: null,
+      lastBackup: false,
+      lastIssue: null,
       lastAt: null,
     };
   }
@@ -395,7 +407,26 @@
     try {
       var raw = localStorage.getItem(TELEMETRY_KEY);
       var parsed = raw ? JSON.parse(raw) : null;
-      return parsed && typeof parsed === "object" ? parsed : defaultTelemetry();
+      if (parsed && typeof parsed === "object") {
+        // Migrate older keys to the friendly names.
+        if (typeof parsed.campaigns === "undefined" && typeof parsed.generations !== "undefined") {
+          parsed.campaigns = parsed.generations;
+        }
+        if (typeof parsed.stumbles === "undefined" && typeof parsed.failures !== "undefined") {
+          parsed.stumbles = parsed.failures;
+        }
+        if (typeof parsed.lastEngine === "undefined" && typeof parsed.lastModel !== "undefined") {
+          parsed.lastEngine = parsed.lastModel;
+        }
+        if (typeof parsed.lastIssue === "undefined" && typeof parsed.lastError !== "undefined") {
+          parsed.lastIssue = parsed.lastError;
+        }
+        if (typeof parsed.lastBackup === "undefined" && typeof parsed.lastFallback !== "undefined") {
+          parsed.lastBackup = parsed.lastFallback;
+        }
+        return parsed;
+      }
+      return defaultTelemetry();
     } catch (err) {
       return defaultTelemetry();
     }
@@ -409,23 +440,23 @@
     }
   }
 
-  function recordSuccess(model, usedFallback, ms) {
+  function recordSuccess(engine, usedBackup, ms) {
     var t = loadTelemetry();
-    t.generations += 1;
+    t.campaigns += 1;
     t.successes += 1;
     t.totalMs += Math.max(0, ms || 0);
-    t.lastModel = model || null;
-    t.lastFallback = !!usedFallback;
-    t.lastError = null;
+    t.lastEngine = engine || null;
+    t.lastBackup = !!usedBackup;
+    t.lastIssue = null;
     t.lastAt = new Date().toISOString();
     saveTelemetry(t);
   }
 
-  function recordFailure(errMsg) {
+  function recordStumble(errMsg) {
     var t = loadTelemetry();
-    t.generations += 1;
-    t.failures += 1;
-    t.lastError = errMsg || "Unknown error";
+    t.campaigns += 1;
+    t.stumbles += 1;
+    t.lastIssue = errMsg || "Unknown issue";
     t.lastAt = new Date().toISOString();
     saveTelemetry(t);
   }
@@ -444,63 +475,63 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Gateway profile (GET /api/generate)
+  // Creator Studio status (GET /api/generate)
   // ---------------------------------------------------------------------------
-  function fetchGatewayProfile() {
+  function fetchStudioStatus() {
     return fetch("/api/generate", { method: "GET", cache: "no-store" })
       .then(function (res) {
         return res.text().then(function (text) {
           var json = null;
           try { json = text ? JSON.parse(text) : null; } catch (err) { json = null; }
-          if (!res.ok || !json || !json.success) throw new Error("gateway unreachable");
+          if (!res.ok || !json || !json.success) throw new Error("studio unreachable");
           return json;
         });
       })
       .then(function (json) {
-        state.gateway = json;
+        state.studio = json;
         renderHeaderStatus();
         renderPerformance();
-        renderProfiles();
+        renderStudio();
         return json;
       })
       .catch(function () {
-        state.gateway = null;
+        state.studio = null;
         renderHeaderStatus();
         renderPerformance();
-        renderProfiles();
+        renderStudio();
         return null;
       });
   }
 
   function renderHeaderStatus() {
     headerStatus.classList.remove("ok", "warn");
-    if (state.gateway) {
-      if (state.gateway.keyConfigured) {
+    if (state.studio) {
+      if (state.studio.accessKeyConnected) {
         headerStatus.classList.add("ok");
-        headerStatusText.textContent = "API Online · Key ✓";
+        headerStatusText.textContent = "Engines ready";
       } else {
         headerStatus.classList.add("warn");
-        headerStatusText.textContent = "API Online · Key missing";
+        headerStatusText.textContent = "Add Secure Access Key";
       }
     } else {
-      headerStatusText.textContent = "Static preview";
+      headerStatusText.textContent = "Preview mode";
     }
   }
 
   function renderPerformance() {
     var t = loadTelemetry();
-    var total = t.generations || 0;
+    var total = t.campaigns || 0;
     var successRate = total ? Math.round((t.successes / total) * 100) : 0;
     var avgMs = t.successes ? Math.round(t.totalMs / t.successes) : null;
     var avgSec = avgMs == null ? "—" : (avgMs / 1000).toFixed(1) + "s";
 
     var tiles = [
-      { label: "Generations", value: String(total) },
-      { label: "Success rate", value: successRate + "%" },
-      { label: "Avg response", value: avgSec },
-      { label: "Storage used", value: storageUsageKB() + " KB" },
-      { label: "Last model", value: t.lastModel ? shortModel(t.lastModel) : "—", small: true },
-      { label: "Last failover", value: t.lastFallback ? "Yes" : "No" },
+      { label: "Campaigns", value: String(total) },
+      { label: "Success", value: successRate + "%" },
+      { label: "Avg speed", value: avgSec },
+      { label: "Storage", value: storageUsageKB() + " KB" },
+      { label: "Last engine", value: t.lastEngine ? (ENGINE_LABELS[t.lastEngine] || t.lastEngine) : "—", small: true },
+      { label: "Backup used", value: t.lastBackup ? "Yes" : "No" },
     ];
 
     metricsGrid.innerHTML = tiles.map(function (m) {
@@ -512,72 +543,80 @@
       );
     }).join("");
 
-    // Server status card
-    if (state.gateway) {
-      var lastErr = t.lastError ? '<div class="row"><span class="k">Last error</span><span class="v">' + esc(String(t.lastError).slice(0, 90)) + "</span></div>" : "";
-      gatewayStatus.innerHTML =
-        '<div class="row"><span class="k">Service</span><span class="v">' + esc(state.gateway.service || "OpenRouter Gateway") + "</span></div>" +
-        '<div class="row"><span class="k">API key</span><span class="v">' + (state.gateway.keyConfigured ? '<span class="badge-ok">Configured</span>' : '<span class="badge-no">Missing</span>') + "</span></div>" +
-        '<div class="row"><span class="k">Active models</span><span class="v">' + esc(String((state.gateway.models || []).length)) + "</span></div>" +
-        '<div class="row"><span class="k">Max duration</span><span class="v">' + esc(String(state.gateway.maxDurationSeconds)) + "s</span></div>" +
-        lastErr;
+    if (state.studio) {
+      var lastIssue = t.lastIssue
+        ? '<div class="row"><span class="k">Last stumble</span><span class="v">' + esc(String(t.lastIssue).slice(0, 90)) + "</span></div>"
+        : "";
+      studioStatus.innerHTML =
+        '<div class="row"><span class="k">Content Engine</span><span class="v">' + esc(state.studio.service || "ScriptForge AI — Content Engine") + "</span></div>" +
+        '<div class="row"><span class="k">Secure Access Key</span><span class="v">' + (state.studio.accessKeyConnected ? '<span class="badge-ok">Connected</span>' : '<span class="badge-no">Not connected</span>') + "</span></div>" +
+        '<div class="row"><span class="k">Engines online</span><span class="v">' + esc(String((state.studio.engines || []).length)) + "</span></div>" +
+        '<div class="row"><span class="k">Response window</span><span class="v">' + esc(String(state.studio.responseWindowSeconds)) + "s</span></div>" +
+        lastIssue;
     } else {
-      gatewayStatus.innerHTML =
-        '<div class="row"><span class="k">Gateway</span><span class="v"><span class="badge-no">Unreachable</span></span></div>' +
-        '<div class="row"><span class="k">Hint</span><span class="v">Deploy to Vercel and set OPENROUTER_API_KEY to go live.</span></div>';
+      studioStatus.innerHTML =
+        '<div class="row"><span class="k">Studio</span><span class="v"><span class="badge-no">Offline</span></span></div>' +
+        '<div class="row"><span class="k">Next step</span><span class="v">Connect your Secure Access Key to go live.</span></div>';
     }
   }
 
-  function renderProfiles() {
-    var models = state.gateway && state.gateway.models && state.gateway.models.length
-      ? state.gateway.models
-      : MODEL_MIRROR;
+  function renderStudio() {
+    var engines = state.studio && state.studio.engines && state.studio.engines.length
+      ? state.studio.engines
+      : ENGINE_MIRROR;
     var t = loadTelemetry();
 
-    profilesList.innerHTML = models.map(function (m) {
-      var isPrimary = m.role === "primary";
-      var live = t.lastModel === m.id;
+    studioList.innerHTML = engines.map(function (e) {
+      var live = t.lastEngine === e.id;
+      var label = ENGINE_LABELS[e.id] || e.id;
+      var roleLabel = ROLE_LABELS[e.role] || "Engine";
       return (
-        '<div class="profile-card' + (live ? " current" : "") + '">' +
-          '<div class="profile-top">' +
-            '<span class="profile-model">' + esc(m.id) + "</span>" +
-            '<span class="role-badge ' + (isPrimary ? "role-primary" : "role-failover") + '">' + (isPrimary ? "Primary" : "Failover") + "</span>" +
+        '<div class="engine-card' + (live ? " current" : "") + '">' +
+          '<div class="engine-top">' +
+            '<span class="engine-name">' + esc(label) + "</span>" +
+            '<span class="role-badge role-' + esc(e.role) + '">' + esc(roleLabel) + "</span>" +
           "</div>" +
-          '<div class="profile-status' + (live ? " live" : "") + '">' +
+          '<div class="engine-status' + (live ? " live" : "") + '">' +
             '<span class="dot"></span>' +
-            (live ? "Last used for a live generation" : (isPrimary ? "Primary router target" : "Automated failover standby")) +
+            (live
+              ? "Served your last campaign"
+              : (e.role === "lead"
+                  ? "Handles every launch first"
+                  : e.role === "dynamic"
+                    ? "Catches anything that stumbles"
+                    : "Steps in automatically")) +
             '<span class="free">FREE</span>' +
           "</div>" +
         "</div>"
       );
     }).join("");
 
-    if (state.gateway) {
-      keyStatus.innerHTML =
-        '<div class="row"><span class="k">OPENROUTER_API_KEY</span><span class="v">' +
-        (state.gateway.keyConfigured ? '<span class="badge-ok">Configured</span>' : '<span class="badge-no">Not set</span>') +
+    if (state.studio) {
+      keyCard.innerHTML =
+        '<div class="row"><span class="k">Secure Access Key</span><span class="v">' +
+        (state.studio.accessKeyConnected ? '<span class="badge-ok">Connected</span>' : '<span class="badge-no">Not connected</span>') +
         "</span></div>" +
-        '<div class="row"><span class="k">Routing</span><span class="v">Server-side, in api/generate.js</span></div>' +
-        '<div class="row"><span class="k">Secret exposure</span><span class="v">Never sent to the browser</span></div>';
+        '<div class="row"><span class="k">Routing</span><span class="v">Handled securely server-side</span></div>' +
+        '<div class="row"><span class="k">Your key</span><span class="v">Never leaves the server</span></div>';
     } else {
-      keyStatus.innerHTML =
-        '<div class="row"><span class="k">Gateway</span><span class="v"><span class="badge-no">Unreachable</span></span></div>' +
-        '<div class="row"><span class="k">Profile source</span><span class="v">Offline mirror</span></div>';
+      keyCard.innerHTML =
+        '<div class="row"><span class="k">Studio</span><span class="v"><span class="badge-no">Offline</span></span></div>' +
+        '<div class="row"><span class="k">Engine list</span><span class="v">Offline preview</span></div>';
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Loading / skeleton / error states
+  // Loading / skeleton / notice states
   // ---------------------------------------------------------------------------
   function setLoading(loading) {
     state.loading = loading;
     generateBtn.disabled = loading;
     if (loading) {
-      generateBtnLabel.textContent = "Generating…";
+      generateBtnLabel.textContent = "Drafting…";
       generateBtn.querySelector(".gen-icon").outerHTML =
         '<span class="spinner" aria-hidden="true"></span>';
     } else {
-      generateBtnLabel.textContent = "Generate Viral Script";
+      generateBtnLabel.textContent = "Launch Viral Campaign";
       generateBtn.querySelector(".spinner").outerHTML =
         '<svg class="gen-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M13 2 4.5 14H11l-1.5 8L18.5 10H12l1-8z" fill="currentColor" /></svg>';
     }
@@ -596,18 +635,18 @@
             '<div class="sk-line shimmer w40"></div>' +
           '</div>' +
         '</div>' +
-        '<div class="sk-label"><span class="dot"></span> Crafting hooks, script &amp; metadata…</div>' +
+        '<div class="sk-label"><span class="dot"></span> Crafting hooks, script &amp; description…</div>' +
         '<div class="sk-block shimmer"></div>' +
         '<div class="sk-block shimmer"></div>' +
       '</div>';
   }
 
-  function renderError(title, message, detail) {
+  function renderNotice(title, message, detail) {
     statusArea.hidden = false;
     outputSection.hidden = true;
     statusArea.innerHTML =
-      '<div class="glass card status-card error">' +
-        '<div class="status-title">⚠️ ' + esc(title) + '</div>' +
+      '<div class="glass card status-card">' +
+        '<div class="status-title">' + esc(title) + '</div>' +
         '<p class="status-msg">' + esc(message) + '</p>' +
         (detail ? '<p class="status-detail">' + esc(detail) + '</p>' : "") +
         '<div class="status-actions">' +
@@ -616,12 +655,12 @@
         '</div>' +
       '</div>';
 
-    $("retryBtn").addEventListener("click", generate);
+    $("retryBtn").addEventListener("click", launch);
     $("demoBtn").addEventListener("click", function () {
       state.current = JSON.parse(JSON.stringify(DEMO_DATA));
       renderOutput(state.current);
       statusArea.hidden = true;
-      toast("Showing demo campaign (offline preview)");
+      toast("Showing a demo campaign");
     });
   }
 
@@ -631,12 +670,12 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Generate
+  // Launch campaign
   // ---------------------------------------------------------------------------
-  function generate() {
+  function launch() {
     var niche = nicheInput.value.trim();
     if (!niche) {
-      toast("Enter a niche or topic first ✍️");
+      toast("Tell us your video idea first ✍️");
       nicheInput.focus();
       return;
     }
@@ -664,7 +703,7 @@
           var json = null;
           try { json = text ? JSON.parse(text) : null; } catch (err) { json = null; }
           if (!res.ok || !json || !json.success) {
-            var err = new Error((json && json.error) || "Request failed (HTTP " + res.status + ").");
+            var err = new Error((json && json.error) || "That didn't go through (HTTP " + res.status + ").");
             err.detail = (json && (json.detail || json.hint)) || null;
             err.notDeployed = (res.status === 404 || res.status === 405);
             throw err;
@@ -676,32 +715,32 @@
         state.current = json.data;
         renderOutput(state.current);
         pushHistory(state.current);
-        recordSuccess(json.model, json.usedFallback, Date.now() - startedAt);
+        recordSuccess(json.engine, json.usedBackup, Date.now() - startedAt);
         clearStatus();
         renderPerformance();
-        renderProfiles();
+        renderStudio();
         window.scrollTo({ top: 0, behavior: "smooth" });
-        toast("Campaign generated 🎉" + (json.usedFallback ? " (failover model)" : ""));
+        toast(json.usedBackup ? "A backup engine stepped in automatically." : "Campaign ready 🎉");
       })
       .catch(function (err) {
-        recordFailure(err.message || "Request failed");
+        recordStumble(err.message || "Launch failed");
         renderPerformance();
         if (err instanceof TypeError) {
-          renderError(
-            "Could not reach the server",
-            "This happens when the app is opened as a static file or the Vercel function is not deployed yet. Deploy the project and set OPENROUTER_API_KEY, then try again.",
-            "You can still explore the full UI with the demo campaign below."
+          renderNotice(
+            "Connection lost",
+            "We couldn't reach the studio. Check your connection and try again.",
+            "You can still explore with a demo campaign."
           );
         } else if (err.notDeployed) {
-          renderError(
-            "Backend not found",
-            "The /api/generate endpoint is not reachable — the project isn't deployed to Vercel yet (or you are previewing the static files only).",
-            "Deploy the repo to Vercel and set OPENROUTER_API_KEY. You can explore the full UI with the demo campaign below."
+          renderNotice(
+            "Studio offline",
+            "This workspace isn't connected to a live engine yet.",
+            "Connect it and launch again. Explore with a demo campaign meanwhile."
           );
         } else {
-          renderError(
-            err.message || "Something went wrong",
-            "The generation failed. Please try again in a moment.",
+          renderNotice(
+            err.message || "Something went sideways",
+            "Give it a moment and launch again.",
             err.detail || null
           );
         }
@@ -769,7 +808,7 @@
       );
     }).join("");
 
-    // Metadata
+    // Description & hashtags
     metadataDesc.textContent = data.metadata.description || "";
     hashtagsList.innerHTML = (data.metadata.hashtags || []).map(function (h) {
       return '<span class="hashtag">' + esc(h) + "</span>";
@@ -857,7 +896,7 @@
     var out = [];
     out.push("🎬 VIRAL CAMPAIGN — " + data.niche);
     out.push("Language: " + (LANG_LABELS[data.language] || data.language) +
-      " · Platform: " + data.platform + " · Duration: " + data.duration);
+      " · Platform: " + data.platform + " · Length: " + data.duration);
     out.push("Virality Score: " + data.viralityScore + "/99");
     out.push("");
     out.push("── HOOKS ──");
@@ -869,7 +908,7 @@
     out.push("── SCRIPT ──");
     out.push(formatScript(data));
     out.push("");
-    out.push("── METADATA ──");
+    out.push("── DESCRIPTION & HASHTAGS ──");
     out.push("Description: " + (data.metadata.description || ""));
     out.push("Hashtags: " + (data.metadata.hashtags || []).join(" "));
     return out.join("\n");
@@ -903,7 +942,7 @@
     }
     copyText(text).then(function (ok) {
       if (ok) {
-        flashCopied(button, key === "all" ? "Copied ✓ Whole campaign" : "Copied ✓");
+        flashCopied(button, key === "all" ? "Copied ✓ Full campaign" : "Copied ✓");
       } else {
         toast("Clipboard blocked — copy manually");
       }
@@ -954,7 +993,7 @@
 
     if (!list.length) {
       historyList.innerHTML =
-        '<div class="history-empty">No generations yet — your saved campaigns will appear here, stored privately on this device.</div>';
+        '<div class="history-empty">Nothing here yet. Launch your first campaign.</div>';
       return;
     }
 
@@ -1024,8 +1063,8 @@
     updateCharCount();
     closeSidebar();
     window.scrollTo({ top: 0, behavior: "smooth" });
-    toast("Regenerating with saved inputs…");
-    generate();
+    toast("Drafting again with saved inputs…");
+    launch();
   }
 
   function setSelectIfExists(selectEl, value) {
@@ -1063,9 +1102,14 @@
       applyBrand(platformSelect.value);
     });
 
-    generateBtn.addEventListener("click", generate);
+    generateBtn.addEventListener("click", launch);
     copyAllBtn.addEventListener("click", function () {
       handleCopy(copyAllBtn, "all");
+    });
+
+    // Fine-tune fold
+    foldHead.addEventListener("click", function () {
+      toggleFold();
     });
 
     // Sidebar controls
@@ -1085,9 +1129,9 @@
       renderHistory(historySearch.value);
     });
     clearHistoryBtn.addEventListener("click", clearHistory);
-    refreshGatewayBtn.addEventListener("click", function () {
-      toast("Refreshing server status…");
-      fetchGatewayProfile();
+    refreshStudioBtn.addEventListener("click", function () {
+      toast("Refreshing studio status…");
+      fetchStudioStatus();
     });
 
     // Delegated clicks for copy buttons and history actions.
@@ -1107,11 +1151,11 @@
       }
     });
 
-    // Keyboard: Ctrl/Cmd + Enter generates; Esc closes the sidebar.
+    // Keyboard: Ctrl/Cmd + Enter launches; Esc closes the sidebar.
     nicheInput.addEventListener("keydown", function (e) {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        generate();
+        launch();
       }
     });
     document.addEventListener("keydown", function (e) {
@@ -1122,7 +1166,7 @@
     applyBrand(platformSelect.value);
     updateCharCount();
     renderHistory("");
-    fetchGatewayProfile();
+    fetchStudioStatus();
   }
 
   // Boot when the DOM is ready (script is loaded at end of body anyway).

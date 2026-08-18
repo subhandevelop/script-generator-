@@ -1,33 +1,33 @@
 /* ============================================================================
    ScriptForge AI — style.css
-   Luxury cosmic-midnight design system.
-   Ultra-deep space canvas (#030712), neon violet brand, sliding dashboard
-   sidebar, and dynamic platform brand palettes (TikTok / YouTube / Instagram /
-   LinkedIn). Fully self-contained so it renders identically in a browser, in
-   the Vercel deployment, and inside an Android WebView APK.
+   Obsidian dark-mode design system.
+   Deep black canvas, glassmorphism with ultra-thin borders, soft ambient
+   glows, strict typography hierarchy and generous whitespace. Self-contained
+   so it renders identically in a browser, on Vercel, and inside an Android
+   WebView APK.
    ========================================================================== */
 
 /* ----------------------------------------------------------------------------
    1. Design tokens
    -------------------------------------------------------------------------- */
 :root {
-  /* Cosmic midnight canvas */
-  --canvas: #030712;
-  --canvas-2: #060B18;
-  --canvas-3: #0A1224;
+  /* Obsidian canvas */
+  --canvas: #050507;
+  --canvas-2: #0A0A10;
+  --canvas-3: #12121A;
 
   /* Ink scale */
-  --ink: #E7ECF6;
-  --ink-dim: #97A3B8;
-  --ink-faint: #5B6474;
+  --ink: #EDEFF5;
+  --ink-dim: #9AA3B2;
+  --ink-faint: #5F6878;
 
-  /* Lines & surfaces */
-  --line: rgba(255, 255, 255, 0.07);
-  --line-strong: rgba(255, 255, 255, 0.14);
-  --glass: rgba(255, 255, 255, 0.035);
-  --glass-hi: rgba(255, 255, 255, 0.07);
+  /* Ultra-thin lines & surfaces */
+  --line: rgba(255, 255, 255, 0.05);
+  --line-strong: rgba(255, 255, 255, 0.10);
+  --glass: rgba(255, 255, 255, 0.028);
+  --glass-hi: rgba(255, 255, 255, 0.06);
 
-  /* Neon violet brand (default accent) */
+  /* Neon violet brand */
   --violet-1: #7C3AED;
   --violet-2: #A855F7;
   --violet-3: #E879F9;
@@ -46,9 +46,9 @@
   --red: #F87171;
 
   /* Shape & depth */
-  --radius: 22px;
+  --radius: 24px;
   --radius-sm: 12px;
-  --shadow-1: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --shadow-1: 0 20px 60px rgba(0, 0, 0, 0.5);
 
   /* Type */
   --font-display: "Sora", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -87,10 +87,10 @@ body {
   color: var(--ink);
   background-color: var(--canvas);
   background-image:
-    radial-gradient(980px 660px at 14% -12%, rgba(124, 58, 237, 0.22), transparent 60%),
-    radial-gradient(860px 640px at 90% -6%, rgba(168, 85, 247, 0.16), transparent 62%),
-    radial-gradient(780px 560px at 50% 112%, rgba(34, 211, 238, 0.10), transparent 60%),
-    linear-gradient(180deg, #030712 0%, #040915 100%);
+    radial-gradient(980px 660px at 14% -12%, rgba(124, 58, 237, 0.16), transparent 60%),
+    radial-gradient(860px 640px at 90% -6%, rgba(168, 85, 247, 0.11), transparent 62%),
+    radial-gradient(780px 560px at 50% 112%, rgba(34, 211, 238, 0.07), transparent 60%),
+    linear-gradient(180deg, #050507 0%, #07070C 100%);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   -webkit-tap-highlight-color: transparent;
@@ -104,11 +104,11 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.024) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.024) 1px, transparent 1px);
-  background-size: 46px 46px;
-  -webkit-mask-image: radial-gradient(ellipse 85% 62% at 50% 0%, #000 0%, transparent 78%);
-  mask-image: radial-gradient(ellipse 85% 62% at 50% 0%, #000 0%, transparent 78%);
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(ellipse 85% 60% at 50% 0%, #000 0%, transparent 78%);
+  mask-image: radial-gradient(ellipse 85% 60% at 50% 0%, #000 0%, transparent 78%);
 }
 
 /* Slow drifting aurora glow */
@@ -122,10 +122,10 @@ body::before {
   margin-left: -70vmax;
   pointer-events: none;
   background:
-    radial-gradient(closest-side, rgba(124, 58, 237, 0.18), transparent 70%),
-    radial-gradient(closest-side at 72% 38%, rgba(168, 85, 247, 0.15), transparent 70%),
-    radial-gradient(closest-side at 30% 62%, rgba(34, 211, 238, 0.10), transparent 70%);
-  animation: auroraDrift 28s ease-in-out infinite alternate;
+    radial-gradient(closest-side, rgba(124, 58, 237, 0.14), transparent 70%),
+    radial-gradient(closest-side at 72% 38%, rgba(168, 85, 247, 0.11), transparent 70%),
+    radial-gradient(closest-side at 30% 62%, rgba(34, 211, 238, 0.07), transparent 70%);
+  animation: auroraDrift 30s ease-in-out infinite alternate;
   will-change: transform;
 }
 
@@ -136,14 +136,14 @@ body::before {
   z-index: 0;
   pointer-events: none;
   background-image:
-    radial-gradient(1.2px 1.2px at 12% 22%, rgba(255, 255, 255, 0.7), transparent 100%),
-    radial-gradient(1px 1px at 28% 68%, rgba(255, 255, 255, 0.5), transparent 100%),
-    radial-gradient(1.4px 1.4px at 44% 12%, rgba(255, 255, 255, 0.6), transparent 100%),
-    radial-gradient(1px 1px at 61% 34%, rgba(255, 255, 255, 0.45), transparent 100%),
-    radial-gradient(1.2px 1.2px at 76% 72%, rgba(255, 255, 255, 0.55), transparent 100%),
-    radial-gradient(1px 1px at 88% 20%, rgba(255, 255, 255, 0.5), transparent 100%),
-    radial-gradient(1.3px 1.3px at 94% 52%, rgba(255, 255, 255, 0.6), transparent 100%),
-    radial-gradient(1px 1px at 8% 84%, rgba(255, 255, 255, 0.4), transparent 100%);
+    radial-gradient(1.2px 1.2px at 12% 22%, rgba(255, 255, 255, 0.6), transparent 100%),
+    radial-gradient(1px 1px at 28% 68%, rgba(255, 255, 255, 0.4), transparent 100%),
+    radial-gradient(1.4px 1.4px at 44% 12%, rgba(255, 255, 255, 0.5), transparent 100%),
+    radial-gradient(1px 1px at 61% 34%, rgba(255, 255, 255, 0.35), transparent 100%),
+    radial-gradient(1.2px 1.2px at 76% 72%, rgba(255, 255, 255, 0.45), transparent 100%),
+    radial-gradient(1px 1px at 88% 20%, rgba(255, 255, 255, 0.4), transparent 100%),
+    radial-gradient(1.3px 1.3px at 94% 52%, rgba(255, 255, 255, 0.5), transparent 100%),
+    radial-gradient(1px 1px at 8% 84%, rgba(255, 255, 255, 0.3), transparent 100%);
   animation: twinkle 7s ease-in-out infinite alternate;
 }
 
@@ -153,7 +153,7 @@ body::before {
 }
 
 @keyframes twinkle {
-  from { opacity: 0.55; }
+  from { opacity: 0.5; }
   to   { opacity: 1; }
 }
 
@@ -187,9 +187,14 @@ button {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 1060px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 0 18px;
+  padding: 0 20px;
+}
+
+/* Single focused column for the creative flow */
+.narrow {
+  max-width: 720px;
 }
 
 .glass {
@@ -197,7 +202,7 @@ button {
   -webkit-backdrop-filter: blur(22px) saturate(150%);
   backdrop-filter: blur(22px) saturate(150%);
   border: 1px solid var(--line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow-1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow-1);
 }
 
 .card {
@@ -210,7 +215,7 @@ button {
 .logo-svg {
   width: 38px;
   height: 38px;
-  filter: drop-shadow(0 0 9px rgba(168, 85, 247, 0.75));
+  filter: drop-shadow(0 0 9px rgba(168, 85, 247, 0.7));
   flex-shrink: 0;
 }
 
@@ -220,8 +225,8 @@ button {
 }
 
 .logo-svg.mini {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
 }
 
 .brand-badge {
@@ -239,7 +244,7 @@ button {
   position: sticky;
   top: 0;
   z-index: 60;
-  background: rgba(3, 7, 18, 0.72);
+  background: rgba(5, 5, 7, 0.7);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
   backdrop-filter: blur(20px) saturate(150%);
   border-bottom: 1px solid var(--line);
@@ -291,7 +296,7 @@ button {
   padding: 8px 14px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
   white-space: nowrap;
 }
 
@@ -325,13 +330,13 @@ button {
   gap: 5px;
   border: 1px solid var(--line);
   border-radius: 13px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .burger:hover {
   border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .burger span {
@@ -354,7 +359,7 @@ button {
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: rgba(2, 4, 12, 0.62);
+  background: rgba(2, 2, 6, 0.6);
   -webkit-backdrop-filter: blur(3px);
   backdrop-filter: blur(3px);
   opacity: 0;
@@ -376,7 +381,7 @@ button {
   width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
-  background: rgba(6, 11, 24, 0.92);
+  background: rgba(10, 10, 16, 0.92);
   -webkit-backdrop-filter: blur(24px) saturate(150%);
   backdrop-filter: blur(24px) saturate(150%);
   border-right: 1px solid var(--line);
@@ -452,13 +457,13 @@ button {
 
 .stab:hover {
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .stab.active {
   color: #fff;
   background: var(--grad-soft);
-  border-color: rgba(168, 85, 247, 0.35);
+  border-color: rgba(168, 85, 247, 0.32);
 }
 
 .stab-ico {
@@ -492,8 +497,8 @@ button {
 }
 
 .search-box:focus-within {
-  border-color: rgba(168, 85, 247, 0.6);
-  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.55);
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.1);
 }
 
 .search-box input {
@@ -527,13 +532,13 @@ button {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 15px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .history-item:hover {
   border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .history-niche {
@@ -555,7 +560,7 @@ button {
   font-weight: 600;
   color: var(--ink-dim);
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.03);
   padding: 4px 10px;
   border-radius: 999px;
   white-space: nowrap;
@@ -617,7 +622,7 @@ button {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -646,30 +651,27 @@ button {
   line-height: 1.35;
 }
 
-/* Gateway / key cards */
-.gateway-card,
-.key-card {
+/* Studio cards */
+.studio-card {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
   font-size: 0.86rem;
   color: var(--ink-dim);
 }
 
-.gateway-card .row,
-.key-card .row {
+.studio-card .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
-.gateway-card .k,
-.key-card .k {
+.studio-card .k {
   color: var(--ink-faint);
   font-size: 0.76rem;
   font-weight: 600;
@@ -677,8 +679,7 @@ button {
   letter-spacing: 0.05em;
 }
 
-.gateway-card .v,
-.key-card .v {
+.studio-card .v {
   font-weight: 600;
   color: var(--ink);
   text-align: right;
@@ -696,14 +697,14 @@ button {
 
 .badge-ok {
   color: #10B981;
-  background: rgba(16, 185, 129, 0.14);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.28);
 }
 
 .badge-no {
   color: var(--amber);
-  background: rgba(251, 191, 36, 0.12);
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.28);
 }
 
 .btn-refresh {
@@ -720,39 +721,52 @@ button {
 .btn-refresh:hover {
   color: var(--ink);
   border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
 }
 
-/* API profiles */
-.profiles-list {
+.studio-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.studio-sub {
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  margin-top: -8px;
+}
+
+/* Engine cards */
+.engines-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.profile-card {
+.engine-card {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 15px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.profile-card.current {
-  border-color: rgba(168, 85, 247, 0.4);
+.engine-card.current {
+  border-color: rgba(168, 85, 247, 0.38);
   background: var(--grad-soft);
 }
 
-.profile-top {
+.engine-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.profile-model {
+.engine-name {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--ink);
@@ -769,18 +783,19 @@ button {
   white-space: nowrap;
 }
 
-.role-primary {
+.role-lead {
   color: #fff;
   background: var(--grad);
 }
 
-.role-failover {
+.role-backup,
+.role-dynamic {
   color: var(--ink-dim);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--line);
 }
 
-.profile-status {
+.engine-status {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -788,25 +803,25 @@ button {
   color: var(--ink-faint);
 }
 
-.profile-status .dot {
+.engine-status .dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--ink-faint);
 }
 
-.profile-status.live .dot {
+.engine-status.live .dot {
   background: var(--green);
   box-shadow: 0 0 8px var(--green);
 }
 
-.profile-status .free {
+.engine-status .free {
   margin-left: auto;
   font-size: 0.66rem;
   font-weight: 700;
   color: #10B981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  background: rgba(16, 185, 129, 0.08);
   padding: 2px 8px;
   border-radius: 999px;
 }
@@ -816,14 +831,14 @@ button {
    -------------------------------------------------------------------------- */
 .hero {
   text-align: center;
-  padding: 44px 0 6px;
+  padding: 64px 0 8px;
 }
 
 .hero h1 {
   font-family: var(--font-display);
-  font-size: clamp(1.85rem, 5.6vw, 3rem);
-  line-height: 1.14;
-  letter-spacing: -0.03em;
+  font-size: clamp(1.9rem, 6vw, 3.1rem);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
   font-weight: 800;
 }
 
@@ -835,21 +850,36 @@ button {
 }
 
 .hero-sub {
-  max-width: 620px;
-  margin: 14px auto 0;
+  max-width: 460px;
+  margin: 16px auto 0;
   color: var(--ink-dim);
-  font-size: 1rem;
+  font-size: 1.02rem;
 }
 
 /* ----------------------------------------------------------------------------
    8. Generator card
    -------------------------------------------------------------------------- */
 .generator-card {
-  margin-top: 24px;
-  padding: 26px;
+  margin-top: 28px;
+  padding: 30px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
+  position: relative;
+}
+
+/* Soft ambient glow behind the studio card */
+.generator-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--radius);
+  padding: 1px;
+  background: linear-gradient(160deg, rgba(168, 85, 247, 0.35), rgba(255, 255, 255, 0.04) 40%, rgba(34, 211, 238, 0.18));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 .field-group {
@@ -866,23 +896,17 @@ button {
 }
 
 .field-group label {
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-dim);
 }
 
-.field-hint {
-  font-size: 0.76rem;
-  color: var(--ink-faint);
-  transition: color 0.2s ease;
-}
-
-/* Brand indicator lamp (glows with the selected platform palette) */
+/* Brand indicator lamp */
 .brand-lamp {
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
   box-shadow: 0 0 0 3px var(--brand-1-soft), 0 0 14px var(--brand-1);
@@ -892,42 +916,7 @@ button {
 
 @keyframes lampPulse {
   0%, 100% { opacity: 1; box-shadow: 0 0 0 3px var(--brand-1-soft), 0 0 14px var(--brand-1); }
-  50% { opacity: 0.75; box-shadow: 0 0 0 5px var(--brand-1-soft), 0 0 22px var(--brand-1); }
-}
-
-/* Segmented language control */
-.segmented {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 5px;
-}
-
-.seg {
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--ink-dim);
-  padding: 11px 6px;
-  border-radius: 10px;
-  transition: color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
-  text-align: center;
-}
-
-.seg.script-lang {
-  font-size: 0.78rem;
-}
-
-.seg:hover {
-  color: var(--ink);
-}
-
-.seg.active {
-  background: var(--grad);
-  color: #fff;
-  box-shadow: 0 4px 18px rgba(168, 85, 247, 0.4);
+  50% { opacity: 0.7; box-shadow: 0 0 0 5px var(--brand-1-soft), 0 0 22px var(--brand-1); }
 }
 
 /* Text inputs & selects */
@@ -940,18 +929,19 @@ select {
   width: 100%;
   font: inherit;
   color: var(--ink);
-  background: rgba(0, 0, 0, 0.32);
+  background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 14px 15px;
+  border-radius: 16px;
+  padding: 16px 17px;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 textarea {
   resize: vertical;
-  min-height: 96px;
+  min-height: 118px;
   line-height: 1.55;
+  font-size: 1.02rem;
 }
 
 textarea::placeholder {
@@ -970,21 +960,20 @@ select {
 
 textarea:focus,
 select:focus {
-  border-color: rgba(168, 85, 247, 0.7);
-  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  background-color: rgba(6, 11, 24, 0.66);
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  background-color: rgba(10, 10, 16, 0.6);
 }
 
-/* Platform select inherits the live brand palette */
 #platformSelect:focus {
   border-color: var(--brand-1);
-  box-shadow: 0 0 0 4px var(--brand-1-soft), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 4px var(--brand-1-soft), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .char-count {
   position: absolute;
-  right: 12px;
-  bottom: 10px;
+  right: 14px;
+  bottom: 12px;
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
@@ -1001,7 +990,94 @@ select:focus {
 }
 
 /* ----------------------------------------------------------------------------
-   9. Buttons
+   9. Collapsible fine-tune panel
+   -------------------------------------------------------------------------- */
+.fold {
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+
+.fold-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink-dim);
+  padding: 12px 4px;
+  transition: color 0.2s ease;
+}
+
+.fold-head:hover {
+  color: var(--ink);
+}
+
+.fold-chev {
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+.fold.open .fold-chev {
+  transform: rotate(180deg);
+}
+
+.fold-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fold.open .fold-body {
+  grid-template-rows: 1fr;
+}
+
+.fold-inner {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 2px;
+}
+
+/* Segmented language control */
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 5px;
+}
+
+.seg {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink-dim);
+  padding: 10px 6px;
+  border-radius: 10px;
+  transition: color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+  text-align: center;
+}
+
+.seg.script-lang {
+  font-size: 0.76rem;
+}
+
+.seg:hover {
+  color: var(--ink);
+}
+
+.seg.active {
+  background: var(--grad);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.35);
+}
+
+/* ----------------------------------------------------------------------------
+   10. Buttons
    -------------------------------------------------------------------------- */
 .btn {
   display: inline-flex;
@@ -1009,26 +1085,27 @@ select:focus {
   justify-content: center;
   gap: 10px;
   font-weight: 600;
-  border-radius: 14px;
+  border-radius: 16px;
   transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease, filter 0.18s ease;
 }
 
-/* Generate button adopts the platform brand gradient via --brand-1/--brand-2 */
+/* High-energy launch button — adopts the platform brand gradient */
 .btn-generate {
   width: 100%;
-  padding: 17px 20px;
-  font-size: 1rem;
+  padding: 19px 20px;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
   color: #fff;
   background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
-  box-shadow: 0 10px 34px -8px var(--brand-1), 0 4px 18px -6px var(--brand-2);
+  box-shadow: 0 12px 40px -10px var(--brand-1), 0 5px 22px -8px var(--brand-2);
   position: relative;
   overflow: hidden;
 }
 
 .btn-generate:hover {
   transform: translateY(-1px);
-  filter: brightness(1.06);
-  box-shadow: 0 14px 46px -8px var(--brand-1), 0 6px 24px -6px var(--brand-2);
+  filter: brightness(1.07);
+  box-shadow: 0 16px 52px -10px var(--brand-1), 0 7px 28px -8px var(--brand-2);
 }
 
 .btn-generate:active {
@@ -1050,7 +1127,7 @@ select:focus {
   text-align: center;
   font-size: 0.76rem;
   color: var(--ink-faint);
-  margin-top: -4px;
+  margin-top: -8px;
 }
 
 .spinner {
@@ -1068,7 +1145,7 @@ select:focus {
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--ink-dim);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 13px;
@@ -1079,7 +1156,7 @@ select:focus {
 .btn-copy:hover {
   color: var(--ink);
   border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .btn-copy.copied {
@@ -1100,7 +1177,7 @@ select:focus {
   padding: 16px;
   font-size: 1rem;
   color: #fff;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line-strong);
   border-radius: 16px;
   -webkit-backdrop-filter: blur(12px);
@@ -1108,7 +1185,7 @@ select:focus {
 }
 
 .btn-copy-all:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.09);
   transform: translateY(-1px);
 }
 
@@ -1119,7 +1196,7 @@ select:focus {
 }
 
 /* ----------------------------------------------------------------------------
-   10. Skeleton loading (shifting-gradient shimmer)
+   11. Skeleton loading (shifting-gradient shimmer)
    -------------------------------------------------------------------------- */
 .status-wrap {
   margin-top: 24px;
@@ -1188,17 +1265,16 @@ select:focus {
   animation: pulse 1.4s ease-in-out infinite;
 }
 
-/* The mesmerizing shifting-gradient shimmer */
 .shimmer {
   position: relative;
   overflow: hidden;
   background: linear-gradient(
     110deg,
-    rgba(255, 255, 255, 0.04) 8%,
-    rgba(168, 85, 247, 0.14) 22%,
-    rgba(124, 58, 237, 0.18) 36%,
-    rgba(34, 211, 238, 0.12) 50%,
-    rgba(255, 255, 255, 0.04) 64%
+    rgba(255, 255, 255, 0.03) 8%,
+    rgba(168, 85, 247, 0.12) 22%,
+    rgba(124, 58, 237, 0.16) 36%,
+    rgba(34, 211, 238, 0.1) 50%,
+    rgba(255, 255, 255, 0.03) 64%
   );
   background-size: 230% 100%;
   animation: shimmer 2.2s linear infinite;
@@ -1210,28 +1286,24 @@ select:focus {
 }
 
 /* ----------------------------------------------------------------------------
-   11. Status / error card
+   12. Status / notice card (soft — no harsh warnings)
    -------------------------------------------------------------------------- */
 .status-card {
-  padding: 22px 24px;
+  padding: 20px 22px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   align-items: flex-start;
-}
-
-.status-card.error {
-  border: 1px solid rgba(248, 113, 113, 0.35);
-  background: rgba(248, 113, 113, 0.07);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  background: rgba(251, 191, 36, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .status-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.02rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-size: 1rem;
+  color: var(--ink);
 }
 
 .status-msg {
@@ -1241,7 +1313,7 @@ select:focus {
 
 .status-detail {
   color: var(--ink-faint);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   word-break: break-word;
   max-width: 100%;
 }
@@ -1250,17 +1322,17 @@ select:focus {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 /* ----------------------------------------------------------------------------
-   12. Output section
+   13. Output section
    -------------------------------------------------------------------------- */
 .output-section {
-  margin-top: 24px;
+  margin-top: 28px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
 .fade-up {
@@ -1283,8 +1355,8 @@ select:focus {
 
 .gauge-wrap {
   position: relative;
-  width: 168px;
-  height: 168px;
+  width: 160px;
+  height: 160px;
   flex-shrink: 0;
   margin: 0 auto;
 }
@@ -1296,13 +1368,13 @@ select:focus {
 
 .gauge-track {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.06);
-  stroke-width: 14;
+  stroke: rgba(255, 255, 255, 0.05);
+  stroke-width: 13;
 }
 
 .gauge-fill {
   fill: none;
-  stroke-width: 14;
+  stroke-width: 13;
   stroke-linecap: round;
   stroke-dasharray: 528;
   stroke-dashoffset: 528;
@@ -1323,7 +1395,7 @@ select:focus {
 
 .score-value {
   font-family: var(--font-display);
-  font-size: 2.5rem;
+  font-size: 2.4rem;
   font-weight: 800;
   line-height: 1;
   background: var(--grad);
@@ -1335,7 +1407,7 @@ select:focus {
 
 .score-cap {
   margin-top: 6px;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1347,12 +1419,12 @@ select:focus {
   min-width: 220px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .meter-right h2 {
   font-family: var(--font-display);
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -1420,13 +1492,13 @@ select:focus {
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.02);
   transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
 
 .hook-item:hover {
   border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.04);
   transform: translateX(2px);
 }
 
@@ -1466,7 +1538,7 @@ select:focus {
   border: 1px solid var(--line);
   border-radius: 16px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.015);
   transition: border-color 0.2s ease;
 }
 
@@ -1480,7 +1552,7 @@ select:focus {
   gap: 10px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .scene-badge {
@@ -1558,20 +1630,20 @@ select:focus {
   font-size: 0.8rem;
   font-weight: 600;
   color: #C4B5FD;
-  background: rgba(124, 58, 237, 0.14);
-  border: 1px solid rgba(168, 85, 247, 0.28);
+  background: rgba(124, 58, 237, 0.13);
+  border: 1px solid rgba(168, 85, 247, 0.26);
   padding: 5px 12px;
   border-radius: 999px;
   transition: background 0.18s ease, transform 0.18s ease;
 }
 
 .hashtag:hover {
-  background: rgba(124, 58, 237, 0.24);
+  background: rgba(124, 58, 237, 0.22);
   transform: translateY(-1px);
 }
 
 /* ----------------------------------------------------------------------------
-   13. Toast
+   14. Toast
    -------------------------------------------------------------------------- */
 .toast {
   position: fixed;
@@ -1581,7 +1653,7 @@ select:focus {
   transform: translateX(-50%) translateY(16px);
   opacity: 0;
   max-width: calc(100vw - 40px);
-  background: rgba(10, 18, 36, 0.94);
+  background: rgba(12, 12, 20, 0.94);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   border: 1px solid var(--line-strong);
@@ -1601,13 +1673,13 @@ select:focus {
 }
 
 /* ----------------------------------------------------------------------------
-   14. Footer
+   15. Footer
    -------------------------------------------------------------------------- */
 .site-footer {
   position: relative;
   z-index: 1;
-  margin-top: 46px;
-  padding: 30px 0 46px;
+  margin-top: 52px;
+  padding: 30px 0 48px;
   text-align: center;
   color: var(--ink-faint);
   font-size: 0.82rem;
@@ -1628,7 +1700,7 @@ select:focus {
 }
 
 /* ----------------------------------------------------------------------------
-   15. RTL support (Urdu output)
+   16. RTL support (Urdu output)
    -------------------------------------------------------------------------- */
 .rtl {
   direction: rtl;
@@ -1645,7 +1717,7 @@ select:focus {
 }
 
 /* ----------------------------------------------------------------------------
-   16. Keyframes
+   17. Keyframes
    -------------------------------------------------------------------------- */
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -1657,7 +1729,7 @@ select:focus {
 }
 
 /* ----------------------------------------------------------------------------
-   17. Responsive breakpoints (mobile-first, no horizontal scroll)
+   18. Responsive breakpoints (mobile-first, no horizontal scroll)
    -------------------------------------------------------------------------- */
 @media (max-width: 640px) {
   .field-row {
@@ -1666,7 +1738,11 @@ select:focus {
 
   .generator-card,
   .block-card {
-    padding: 20px;
+    padding: 22px;
+  }
+
+  .hero {
+    padding-top: 48px;
   }
 
   .meter-card {
@@ -1713,8 +1789,8 @@ select:focus {
   }
 
   .gauge-wrap {
-    width: 148px;
-    height: 148px;
+    width: 146px;
+    height: 146px;
   }
 
   .status-pill {
@@ -1724,7 +1800,7 @@ select:focus {
 }
 
 /* ----------------------------------------------------------------------------
-   18. Reduced motion
+   19. Reduced motion
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *,
